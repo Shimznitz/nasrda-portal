@@ -1,0 +1,80 @@
+/* src/app/staff/notifications/notifications.css */
+
+.notifications-page { max-width: 800px; }
+
+.page-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 28px;
+}
+
+.page-header h1 {
+  font-size: 2.5rem;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 6px;
+}
+
+.page-header p { color: var(--text3); font-size: 1rem; }
+
+.mark-all-btn {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text2);
+  padding: 10px 18px;
+  border-radius: 8px;
+  font-size: 0.88rem;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.mark-all-btn:hover { border-color: var(--gold); color: var(--gold); }
+
+.notif-list { display: flex; flex-direction: column; gap: 10px; }
+
+.notif-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 18px 20px;
+  cursor: pointer;
+  transition: all 0.15s;
+  position: relative;
+}
+
+.notif-card:hover { border-color: var(--gold); }
+.notif-card.unread { border-color: rgba(201,168,76,0.3); background: var(--gold-dim); }
+
+.notif-icon { font-size: 1.4rem; flex-shrink: 0; margin-top: 2px; }
+
+.notif-body { flex: 1; }
+
+.notif-title { font-size: 0.95rem; color: var(--text); font-weight: 500; margin-bottom: 4px; }
+
+.notif-text { font-size: 0.88rem; color: var(--text2); line-height: 1.5; margin-bottom: 8px; }
+
+.notif-time { font-size: 0.75rem; color: var(--text3); font-family: 'IBM Plex Mono', monospace; }
+
+.unread-dot {
+  width: 8px; height: 8px;
+  background: var(--gold);
+  border-radius: 50%;
+  flex-shrink: 0;
+  margin-top: 6px;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 80px 20px;
+  color: var(--text3);
+  background: var(--bg2);
+  border: 1px dashed var(--border);
+  border-radius: 16px;
+}
+
+.loading { color: var(--text3); padding: 40px; text-align: center; }

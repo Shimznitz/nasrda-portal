@@ -1,0 +1,91 @@
+/* src/app/staff/submit/submit.css */
+
+.submit-page {
+  max-width: 800px;
+}
+
+.page-header h1 {
+  font-size: 2.5rem;
+  color: var(--text);
+}
+
+.page-header p {
+  color: var(--text3);
+  margin-top: 8px;
+}
+
+.submit-card {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 40px;
+  margin-top: 30px;
+}
+
+.form-group {
+  margin-bottom: 28px;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--text3);
+  font-size: 0.95rem;
+}
+
+.select-input,
+textarea {
+  width: 100%;
+  background: var(--bg3);
+  border: 1px solid var(--border2);
+  border-radius: 10px;
+  padding: 14px 16px;
+  color: var(--text);
+  font-size: 1rem;
+}
+
+textarea {
+  resize: vertical;
+  min-height: 120px;
+}
+
+.file-upload-area {
+  border: 2px dashed var(--border2);
+  border-radius: 12px;
+  padding: 40px;
+  text-align: center;
+  background: var(--bg3);
+  transition: all 0.2s;
+}
+
+.file-upload-area:hover {
+  border-color: var(--gold);
+}
+
+.upload-label {
+  color: var(--text2);
+  cursor: pointer;
+  font-size: 1rem;
+}
+
+.submit-btn {
+  width: 100%;
+  background: var(--gold);
+  color: #0a0c10;
+  border: none;
+  padding: 16px;
+  border-radius: 10px;
+  font-weight: 600;
+  font-size: 1.05rem;
+  cursor: pointer;
+  margin-top: 20px;
+}
+
+.submit-btn:hover:not(:disabled) {
+  background: var(--gold2);
+}
+
+.submit-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}

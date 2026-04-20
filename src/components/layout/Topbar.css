@@ -1,0 +1,81 @@
+/* src/components/layout/Topbar.css */
+
+.topbar {
+  height: 64px;
+  min-height: 64px;
+  background: var(--bg2);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  padding: 0 32px;
+}
+
+.topbar-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+}
+
+.topbar .greeting { font-size: 1rem; color: var(--text2); }
+.topbar .greeting .highlight { color: var(--gold); font-weight: 500; }
+
+.topbar-right { display: flex; align-items: center; gap: 12px; }
+
+.theme-toggle {
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  width: 36px; height: 36px;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  font-size: 1rem;
+  transition: all 0.15s;
+}
+
+.theme-toggle:hover { border-color: var(--gold); }
+
+.icon-btn {
+  position: relative;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  width: 36px; height: 36px;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  font-size: 1rem;
+  text-decoration: none;
+  transition: all 0.15s;
+}
+
+.icon-btn:hover { border-color: var(--gold); }
+
+.badge {
+  position: absolute;
+  top: -5px; right: -5px;
+  background: #e05c5c;
+  color: white;
+  font-size: 0.6rem;
+  font-weight: 700;
+  width: 16px; height: 16px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-family: 'IBM Plex Mono', monospace;
+}
+
+.topbar .user-info { display: flex; align-items: center; gap: 12px; }
+
+.topbar .user-name { font-size: 0.9rem; font-weight: 500; color: var(--text); text-align: right; }
+
+.topbar .user-role { font-size: 0.75rem; color: var(--text3); font-family: 'IBM Plex Mono', monospace; text-align: right; }
+
+.topbar .user-avatar {
+  width: 36px; height: 36px;
+  background: var(--gold-dim);
+  border: 1px solid var(--gold);
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.8rem; font-weight: 600;
+  color: var(--gold);
+  font-family: 'IBM Plex Mono', monospace;
+}
