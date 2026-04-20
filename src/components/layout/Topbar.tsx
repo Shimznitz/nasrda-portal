@@ -80,7 +80,9 @@ export default function Topbar() {
               <div className="user-name">{name}</div>
               <div className="user-role">{role}</div>
             </div>
-            <div className="user-avatar">{initials}</div>
+            <Link href="/staff/profile" style={{ textDecoration: 'none' }}>
+  <div className="user-avatar">{initials}</div>
+</Link>
           </div>
         </div>
       </div>
