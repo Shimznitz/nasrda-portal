@@ -1,44 +1,69 @@
 // src/app/staff/projects/page.tsx
 'use client';
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
+import { useRouter } from "next/navigation";
 import "./projects.css";
 
 export default function AllProjects() {
+  const router = useRouter();
   const [projects, setProjects] = useState<any[]>([]);
   const [filtered, setFiltered] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [selected, setSelected] = useState<any>(null);
   const [profile, setProfile] = useState<any>(null);
   const [showCreate, setShowCreate] = useState(false);
 
   useEffect(() => {
-    const load = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-      const { data: prof } = await supabase
-        .from('profiles').select('*').eq('id', user.id).single();
-      setProfile(prof);
-      await fetchProjects(prof, user.id);
-    };
-    load();
+    loadInitialData();
   }, []);
 
+  const loadInitialData = useCallback(async () => {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const { data: prof } = await supabase
+      .from('profiles').select('*').eq('id', user.id).single();
+    
+    setProfile(prof);
+    await fetchProjects(prof, user.id);
+  } catch (err) {
+    console.error(err);
+  }
+}, []);
+
+useEffect(() => {
+  loadInitialData();
+}, [loadInitialData]);
+
   const fetchProjects = async (prof: any, userId: string) => {
+    setLoading(true);
+
     let query = supabase
       .from('projects')
-      .select('*, centres(name, location), profiles(name)')
+      .select('*, centres(name, location)')
       .order('created_at', { ascending: false });
 
-    if (prof?.role === 'CENTRE_ADMIN') {
+    if (prof?.role === 'CENTRE_ADMIN' && prof.centre_id) {
       query = query.eq('centre_id', prof.centre_id);
     } else if (prof?.role === 'STAFF') {
       const { data: memberships } = await supabase
-        .from('project_members').select('project_id').eq('profile_id', userId);
+        .from('project_members')
+        .select('project_id')
+        .eq('profile_id', userId);
+
       const ids = memberships?.map((m: any) => m.project_id) || [];
-      query = query.in('id', ids.length ? ids : ['none']);
+      
+      if (ids.length > 0) {
+        query = query.in('id', ids);
+      } else {
+        setProjects([]);
+        setFiltered([]);
+        setLoading(false);
+        return;
+      }
     }
 
     const { data } = await query;
@@ -48,18 +73,24 @@ export default function AllProjects() {
   };
 
   useEffect(() => {
-    if (!search) { setFiltered(projects); return; }
+    if (!search.trim()) {
+      setFiltered(projects);
+      return;
+    }
     const q = search.toLowerCase();
-    setFiltered(projects.filter((p: any) => p.title?.toLowerCase().includes(q)));
+    setFiltered(projects.filter((p: any) => 
+      p.title?.toLowerCase().includes(q) || 
+      p.centres?.name?.toLowerCase().includes(q)
+    ));
   }, [search, projects]);
 
-  const getStatusClass = (status: string) => {
+  const getStatusClass = (status: string): string => {
     if (status === 'COMPLETED') return 'status-done';
     if (status === 'UNDER_REVIEW') return 'status-review';
     return 'status-progress';
   };
 
-  const getStatusLabel = (status: string) => {
+  const getStatusLabel = (status: string): string => {
     if (status === 'COMPLETED') return 'Completed';
     if (status === 'UNDER_REVIEW') return 'Under Review';
     return 'In Progress';
@@ -73,17 +104,14 @@ export default function AllProjects() {
         <CreateProjectModal
           profile={profile}
           onClose={() => setShowCreate(false)}
-          onCreated={async () => {
-            setShowCreate(false);
-            const { data: { user } } = await supabase.auth.getUser();
-            if (user) await fetchProjects(profile, user.id);
-          }}
+          onCreated={() => loadInitialData()}
         />
       )}
 
       <div className="page-header">
         <div>
-          <h1>{profile?.role === 'SUPER_ADMIN' ? 'All Projects' : profile?.role === 'CENTRE_ADMIN' ? 'Centre Projects' : 'My Projects'}</h1>
+          <h1>{profile?.role === 'SUPER_ADMIN' ? 'All Projects' : 
+               profile?.role === 'CENTRE_ADMIN' ? 'Centre Projects' : 'My Projects'}</h1>
           <p className="subtitle">Projects across the agency</p>
         </div>
         {canCreateProject && (
@@ -92,45 +120,50 @@ export default function AllProjects() {
       </div>
 
       <div className="search-bar">
-        <input type="text" className="input-field" placeholder="Search projects by name..."
-          value={search} onChange={(e) => setSearch(e.target.value)} />
+        <input 
+          type="text" 
+          className="input-field" 
+          placeholder="Search projects by name or centre..." 
+          value={search} 
+          onChange={(e) => setSearch(e.target.value)} 
+        />
       </div>
 
-      {loading ? <p className="loading">Loading projects...</p> :
-        filtered.length === 0 ? (
-          <div className="empty-state"><p>No projects found.</p></div>
-        ) : (
-          <div className="projects-list">
-            {filtered.map((project: any) => (
-              <div key={project.id} className="project-card" onClick={() => setSelected(project)}>
-                <div className="project-header">
-                  <div className="project-title">{project.title}</div>
-                  <div className={`status-badge ${getStatusClass(project.status)}`}>
-                    {getStatusLabel(project.status)}
-                  </div>
+      {loading ? (
+        <p className="loading">Loading projects...</p>
+      ) : filtered.length === 0 ? (
+        <div className="empty-state">
+          <p>No projects found.</p>
+          {profile?.role === 'SUPER_ADMIN' && <p>Click "+ Create Project" to get started.</p>}
+          {profile?.role === 'STAFF' && <p>You have not been assigned to any project yet.</p>}
+        </div>
+      ) : (
+        <div className="projects-list">
+          {filtered.map((project: any) => (
+            <div 
+              key={project.id} 
+              className="project-card" 
+              onClick={() => router.push(`/staff/projects/${project.id}`)}
+            >
+              <div className="project-header">
+                <div className="project-title">{project.title}</div>
+                <div className={`status-badge ${getStatusClass(project.status)}`}>
+                  {getStatusLabel(project.status)}
                 </div>
-                <div className="project-meta">
-                  {project.centres?.name && <span>🏛 {project.centres.name}</span>}
-                  {project.centres?.location && <span>📍 {project.centres.location}</span>}
-                  {project.due_date && <span>📅 Due {new Date(project.due_date).toLocaleDateString()}</span>}
-                  {project.budget && <span>💰 ₦{Number(project.budget).toLocaleString()}</span>}
-                </div>
-                <div className="progress-bar">
-                  <div className="progress-fill" style={{ width: `${project.progress}%` }}></div>
-                </div>
-                <div className="progress-text">{project.progress}% Complete</div>
               </div>
-            ))}
-          </div>
-        )}
-
-      {selected && (
-        <ProjectDetailModal
-          project={selected}
-          onClose={() => setSelected(null)}
-          getStatusClass={getStatusClass}
-          getStatusLabel={getStatusLabel}
-        />
+              <div className="project-meta">
+                {project.centres?.name && <span>🏛 {project.centres.name}</span>}
+                {project.centres?.location && <span>📍 {project.centres.location}</span>}
+                {project.due_date && <span>📅 Due {new Date(project.due_date).toLocaleDateString()}</span>}
+                {project.budget && <span>💰 ₦{Number(project.budget).toLocaleString()}</span>}
+              </div>
+              <div className="progress-bar">
+                <div className="progress-fill" style={{ width: `${project.progress || 0}%` }}></div>
+              </div>
+              <div className="progress-text">{project.progress || 0}% Complete</div>
+            </div>
+          ))}
+        </div>
       )}
     </div>
   );

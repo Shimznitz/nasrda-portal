@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import Image from "next/image";
 import "./Sidebar.css";
 
 export default function Sidebar() {
@@ -32,6 +33,9 @@ export default function Sidebar() {
     { href: '/staff/staff-directory', label: 'Staff Directory' },
     { href: '/staff/messages', label: 'Messages' },
     { href: '/staff/notifications', label: 'Notifications' },
+    { href: '/staff/kobo', label: 'KoboToolbox Forms' },
+    { href: '/staff/questionnaires', label: 'Questionnaires' },
+    { href: '/staff/profile', label: 'My Profile' },
   ] : role === 'CENTRE_ADMIN' ? [
     { href: '/staff/dashboard', label: 'Dashboard' },
     { href: '/staff/divisions', label: 'Manage Divisions' },
@@ -39,26 +43,33 @@ export default function Sidebar() {
     { href: '/staff/staff-directory', label: 'Staff Directory' },
     { href: '/staff/messages', label: 'Messages' },
     { href: '/staff/notifications', label: 'Notifications' },
+    { href: '/staff/questionnaires', label: 'Questionnaires' },
+    { href: '/staff/kobo', label: 'KoboToolbox Forms' },
+    { href: '/staff/profile', label: 'My Profile' },
   ] : role === 'DIVISION_HEAD' || role === 'DEPT_HEAD' ? [
     { href: '/staff/dashboard', label: 'Dashboard' },
     { href: '/staff/divisions', label: 'Manage Units' },
     { href: '/staff/projects', label: 'Projects' },
     { href: '/staff/messages', label: 'Messages' },
     { href: '/staff/notifications', label: 'Notifications' },
+    { href: '/staff/questionnaires', label: 'Questionnaires' },
+    { href: '/staff/kobo', label: 'KoboToolbox Forms' },
+    { href: '/staff/profile', label: 'My Profile' },
   ] : role === 'UNIT_HEAD' ? [
     { href: '/staff/dashboard', label: 'Dashboard' },
     { href: '/staff/projects', label: 'Projects' },
-    { href: '/staff/submit', label: 'Submit Work' },
     { href: '/staff/messages', label: 'Messages' },
     { href: '/staff/notifications', label: 'Notifications' },
     { href: '/staff/profile', label: 'My Profile' },
-  ] : [
+    { href: '/staff/questionnaires', label: 'Questionnaires' },
+    { href: '/staff/kobo', label: 'KoboToolbox Forms' },
+  ] : [  // Regular STAFF
     { href: '/staff/dashboard', label: 'Dashboard' },
     { href: '/staff/projects', label: 'My Projects' },
-    { href: '/staff/submit', label: 'Submit Work' },
     { href: '/staff/messages', label: 'Messages' },
     { href: '/staff/notifications', label: 'Notifications' },
     { href: '/staff/profile', label: 'My Profile' },
+    { href: '/staff/questionnaires', label: 'Questionnaires' },
   ];
 
   const handleSignOut = async () => {
@@ -72,7 +83,16 @@ export default function Sidebar() {
   return (
     <aside className="sidebar">
       <div className="logo-section">
-        <div className="logo-icon">NS</div>
+        <div className="logo-icon">
+          <Image 
+            src="/nasrda-logo.png" 
+            alt="NASRDA Logo" 
+            width={48} 
+            height={48} 
+            className="official-logo"
+            priority
+          />
+        </div>
         <div>
           <div className="logo-title">NASRDA</div>
           <div className="logo-subtitle">STAFF PORTAL</div>
@@ -81,8 +101,11 @@ export default function Sidebar() {
 
       <nav className="nav-section">
         {navItems.map((item) => (
-          <Link key={item.href} href={item.href}
-            className={`nav-link ${pathname === item.href ? 'active' : ''}`}>
+          <Link 
+            key={item.href} 
+            href={item.href}
+            className={`nav-link ${pathname === item.href ? 'active' : ''}`}
+          >
             {item.label}
           </Link>
         ))}

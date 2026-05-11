@@ -107,6 +107,14 @@ body {
 
   .logo-section { display: none !important; }
 
+  .brand-logo {
+  width: 52px;
+  height: 52px;
+  border-radius: 12px;
+  object-fit: contain;
+  border: 2px solid var(--gold);
+}
+
   .nav-section {
     flex-direction: row !important;
     padding: 8px 12px !important;

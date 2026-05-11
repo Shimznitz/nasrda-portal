@@ -1,0 +1,68 @@
+/* src/app/staff/kobo/kobo.css */
+
+.kobo-page {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 40px 24px;
+}
+
+.page-header h1 {
+  font-size: 2.4rem;
+  color: var(--text);
+}
+
+.kobo-actions {
+  display: flex;
+  gap: 16px;
+  margin: 40px 0;
+  flex-wrap: wrap;
+}
+
+.kobo-btn {
+  padding: 16px 32px;
+  border-radius: 12px;
+  font-size: 1.05rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-block;
+  transition: all 0.2s;
+}
+
+.kobo-btn.primary {
+  background: var(--gold);
+  color: #0a0c10;
+}
+
+.kobo-btn.primary:hover {
+  background: var(--gold2);
+  transform: translateY(-2px);
+}
+
+.kobo-btn.secondary {
+  background: var(--bg3);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+
+.kobo-btn.secondary:hover {
+  background: var(--bg4);
+  border-color: var(--gold);
+}
+
+.kobo-info {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 32px;
+}
+
+.kobo-info h3 {
+  color: var(--gold);
+  margin-bottom: 16px;
+}
+
+.kobo-info ul {
+  line-height: 1.8;
+  color: var(--text2);
+}

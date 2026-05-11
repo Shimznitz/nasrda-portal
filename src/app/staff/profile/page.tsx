@@ -3,40 +3,82 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import "./profile.css";
 
 export default function ProfilePage() {
-  const [user, setUser] = useState<any>(null);
+  const [profile, setProfile] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
-      setUser(data.user);
-    });
+    const loadProfile = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data: prof } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single();
+
+      setProfile(prof);
+      setLoading(false);
+    };
+
+    loadProfile();
   }, []);
 
-  const name = user?.user_metadata?.name || user?.email || 'N/A';
-  const designation = user?.user_metadata?.designation || 'N/A';
-  const staffNo = user?.user_metadata?.staffNo || 'N/A';
-  const email = user?.email || 'N/A';
-  const role = user?.user_metadata?.role || 'STAFF';
+  if (loading) return <div className="loading">Loading profile...</div>;
+  if (!profile) return <div className="empty-state">Profile not found</div>;
 
   return (
     <div className="profile-page">
-      <h1>My Profile</h1>
+      <div className="profile-header">
+        <div className="profile-avatar-large">
+          {profile.name?.slice(0, 2).toUpperCase() || 'NA'}
+        </div>
+        <div>
+          <h1>{profile.name}</h1>
+          <p className="designation">{profile.designation}</p>
+          <p className="staff-no">Staff No: {profile.staff_no}</p>
+        </div>
+      </div>
 
-      <div className="profile-card">
-        <div className="profile-avatar">
-          {name.slice(0, 2).toUpperCase()}
+      <div className="profile-content">
+        <div className="info-card">
+          <h3>Personal Information</h3>
+          <div className="info-grid">
+            <div className="info-item">
+              <span className="label">Email</span>
+              <span className="value">{profile.email}</span>
+            </div>
+            <div className="info-item">
+              <span className="label">Role</span>
+              <span className="value role-badge">{profile.role}</span>
+            </div>
+            {profile.centre_name && (
+              <div className="info-item">
+                <span className="label">Centre</span>
+                <span className="value">{profile.centre_name}</span>
+              </div>
+            )}
+            {profile.division_name && (
+              <div className="info-item">
+                <span className="label">Division</span>
+                <span className="value">{profile.division_name}</span>
+              </div>
+            )}
+          </div>
         </div>
 
-        <div className="profile-info">
-          <h2>{name}</h2>
-          <p className="designation">{designation}</p>
-          <p className="staffno">Staff No: {staffNo}</p>
-          <p className="email">{email}</p>
-        </div>
-
-        <div className="role-badge">
-          {role === 'SUPER_ADMIN' ? 'Super Admin (ESS Director)' : role}
+        <div className="quick-stats">
+          <div className="stat-box">
+            <div className="stat-number">12</div>
+            <div className="stat-label">Projects Participated</div>
+          </div>
+          <div className="stat-box">
+            <div className="stat-number">87%</div>
+            <div className="stat-label">Average Completion</div>
+          </div>
         </div>
       </div>
     </div>

@@ -4,6 +4,7 @@
 import { useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 import './login.css';
 
 export default function AuthPage() {
@@ -67,7 +68,15 @@ export default function AuthPage() {
       <div className="auth-container">
         <div className="auth-left">
           <div className="auth-brand">
-            <div className="brand-logo">NS</div>
+            <div className="login-logo-wrapper">
+  <Image
+    src="/nasrdalogo.png"
+    alt="NASRDA Logo"
+    width={90}
+    height={90}
+    className="login-logo"
+  />
+</div>
             <div className="brand-text">
               <div className="brand-name">NASRDA</div>
               <div className="brand-sub">National Space Research and Development Agency</div>

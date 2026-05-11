@@ -11,40 +11,66 @@ export default function Topbar() {
   const [isLight, setIsLight] = useState(false);
   const [unreadNotifs, setUnreadNotifs] = useState(0);
   const [unreadMsgs, setUnreadMsgs] = useState(0);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let mounted = true;
+    let interval: NodeJS.Timeout;
+
     const load = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user || !mounted) return;
 
-      const { data: prof } = await supabase
-        .from('profiles').select('*').eq('id', user.id).single();
-      setProfile(prof);
+        const { data: prof } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', user.id)
+          .single();
 
-      const fetchCounts = async () => {
-        const { count: nc } = await supabase
-          .from('notifications')
-          .select('*', { count: 'exact', head: true })
-          .eq('user_id', user.id)
-          .eq('read', false);
-        setUnreadNotifs(nc || 0);
+        if (mounted) setProfile(prof);
 
-        const { count: mc } = await supabase
-          .from('messages')
-          .select('*', { count: 'exact', head: true })
-          .eq('receiver_id', user.id)
-          .eq('read', false);
-        setUnreadMsgs(mc || 0);
-      };
+        // Fetch notification counts
+        const fetchCounts = async () => {
+          if (!user || !mounted) return;
 
-      fetchCounts();
-      // Poll every 10 seconds
-      const interval = setInterval(fetchCounts, 10000);
-      return () => clearInterval(interval);
+          const { count: nc } = await supabase
+            .from('notifications')
+            .select('*', { count: 'exact', head: true })
+            .eq('user_id', user.id)
+            .eq('read', false);
+
+          const { count: mc } = await supabase
+            .from('messages')
+            .select('*', { count: 'exact', head: true })
+            .eq('receiver_id', user.id)
+            .eq('read', false);
+
+          if (mounted) {
+            setUnreadNotifs(nc || 0);
+            setUnreadMsgs(mc || 0);
+          }
+        };
+
+        await fetchCounts();
+        interval = setInterval(fetchCounts, 15000); // 15 seconds instead of 10
+
+      } catch (err) {
+        console.error("Topbar load error:", err);
+      } finally {
+        if (mounted) setLoading(false);
+      }
     };
 
     load();
+
+    // Theme
     setIsLight(document.body.classList.contains('light-mode'));
+
+    return () => {
+      mounted = false;
+      if (interval) clearInterval(interval);
+    };
   }, []);
 
   const toggleTheme = () => {
@@ -63,26 +89,30 @@ export default function Topbar() {
         <div className="greeting">
           Welcome back, <span className="highlight">{firstName}</span>
         </div>
+
         <div className="topbar-right">
           <button onClick={toggleTheme} className="theme-toggle">
             {isLight ? '☀️' : '🌙'}
           </button>
+
           <Link href="/staff/messages" className="icon-btn">
             💬
             {unreadMsgs > 0 && <span className="badge">{unreadMsgs}</span>}
           </Link>
+
           <Link href="/staff/notifications" className="icon-btn">
             🔔
             {unreadNotifs > 0 && <span className="badge">{unreadNotifs}</span>}
           </Link>
+
           <div className="user-info">
             <div>
               <div className="user-name">{name}</div>
               <div className="user-role">{role}</div>
             </div>
             <Link href="/staff/profile" style={{ textDecoration: 'none' }}>
-  <div className="user-avatar">{initials}</div>
-</Link>
+              <div className="user-avatar">{initials}</div>
+            </Link>
           </div>
         </div>
       </div>
