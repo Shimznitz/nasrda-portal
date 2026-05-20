@@ -85,7 +85,7 @@ export default function Sidebar() {
       <div className="logo-section">
         <div className="logo-icon">
           <Image 
-            src="/nasrda-logo.png" 
+            src="/nasrdalogo.png" 
             alt="NASRDA Logo" 
             width={48} 
             height={48} 
