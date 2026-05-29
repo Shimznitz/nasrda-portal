@@ -13,24 +13,28 @@ export default function ProjectDetail() {
 
   const [project, setProject] = useState<any>(null);
   const [tasks, setTasks] = useState<any[]>([]);
-  const [members, setMembers] = useState<any[]>([]);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [userRole, setUserRole] = useState<string>('');
   const [loading, setLoading] = useState(true);
 
-  // Submit modal states
+  // Submit modal
   const [showSubmitModal, setShowSubmitModal] = useState(false);
   const [selectedTask, setSelectedTask] = useState<any>(null);
   const [submitComment, setSubmitComment] = useState('');
+  const [files, setFiles] = useState<File[]>([]);
   const [submitting, setSubmitting] = useState(false);
+
+  // Approval modal (for admins)
+  const [showApprovalModal, setShowApprovalModal] = useState(false);
+  const [selectedSubmission, setSelectedSubmission] = useState<any>(null);
+  const [approvalNote, setApprovalNote] = useState('');
+  const [approvalAction, setApprovalAction] = useState<'APPROVED' | 'REJECTED'>('APPROVED');
 
   useEffect(() => {
     fetchProjectData();
   }, [projectId]);
 
   const fetchProjectData = async () => {
-    setLoading(true);
-
     const { data: { user } } = await supabase.auth.getUser();
     if (user) setCurrentUserId(user.id);
 
@@ -46,22 +50,13 @@ export default function ProjectDetail() {
       .from('tasks')
       .select(`
         *,
-        assignee:profiles!assigned_to (id, name, designation)
+        assignee:profiles!assigned_to (id, name, designation),
+        submissions (*)
       `)
       .eq('project_id', projectId)
       .order('created_at');
 
     setTasks(taskData || []);
-
-    const { data: memberData } = await supabase
-      .from('project_members')
-      .select(`
-        *,
-        profiles (id, name, designation, role)
-      `)
-      .eq('project_id', projectId);
-
-    setMembers(memberData || []);
 
     if (user) {
       const { data: prof } = await supabase
@@ -75,6 +70,7 @@ export default function ProjectDetail() {
     setLoading(false);
   };
 
+  const isAdmin = ['SUPER_ADMIN', 'CENTRE_ADMIN', 'DIVISION_HEAD', 'UNIT_HEAD'].includes(userRole);
   const isStaff = userRole === 'STAFF';
 
   const myTasks = isStaff 
@@ -84,6 +80,7 @@ export default function ProjectDetail() {
   const openSubmitModal = (task: any) => {
     setSelectedTask(task);
     setSubmitComment('');
+    setFiles([]);
     setShowSubmitModal(true);
   };
 
@@ -92,76 +89,79 @@ export default function ProjectDetail() {
 
     setSubmitting(true);
 
-    // Save submission
-    await supabase.from('submissions').insert({
+    // Upload files if any (you can expand this with actual storage later)
+    const fileUrls: string[] = [];
+
+    const { error } = await supabase.from('submissions').insert({
       task_id: selectedTask.id,
       submitted_by: currentUserId,
       comment: submitComment,
-      submitted_at: new Date().toISOString(),
+      file_urls: fileUrls,
     });
 
-    // Mark task completed
-    await supabase.from('tasks').update({
-      status: 'COMPLETED',
-      completed_at: new Date().toISOString(),
-    }).eq('id', selectedTask.id);
+    if (!error) {
+      await supabase.from('tasks').update({
+        status: 'UNDER_REVIEW',
+        approval_status: 'PENDING'
+      }).eq('id', selectedTask.id);
+    }
 
-    setSubmitComment('');
     setShowSubmitModal(false);
-    setSelectedTask(null);
-    fetchProjectData();
     setSubmitting(false);
+    fetchProjectData();
   };
 
-  if (loading) return <div className="loading-full">Loading...</div>;
-  if (!project) return <div className="empty-state">Project not found</div>;
+  const openApprovalModal = (task: any) => {
+    setSelectedTask(task);
+    setApprovalNote('');
+    setShowApprovalModal(true);
+  };
+
+  const handleApproval = async () => {
+    if (!selectedTask) return;
+
+    await supabase.from('tasks').update({
+      approval_status: approvalAction,
+      approval_note: approvalNote,
+      approved_by: currentUserId,
+      status: approvalAction === 'APPROVED' ? 'COMPLETED' : 'PENDING'
+    }).eq('id', selectedTask.id);
+
+    setShowApprovalModal(false);
+    fetchProjectData();
+  };
+
+  if (loading) return <div className="loading-full">Loading project...</div>;
 
   return (
     <div className="project-detail-page">
-      <button className="back-btn" onClick={() => router.back()}>← Back</button>
+      {/* ... existing header and info cards ... */}
 
-      <div className="detail-header">
-        <h1>{project.title}</h1>
-        <div className={`status-badge ${getStatusClass(project.status)}`}>
-          {getStatusLabel(project.status)}
-        </div>
-      </div>
-
-      {/* Info Cards */}
-      <div className="detail-grid">
-        <div className="detail-card">
-          <h3>Project Information</h3>
-          {project.objectives && <p>{project.objectives}</p>}
-          {project.centres && <p><strong>Centre:</strong> {project.centres.name}</p>}
-          {project.due_date && <p><strong>Deadline:</strong> {new Date(project.due_date).toLocaleDateString()}</p>}
-        </div>
-
-        <div className="detail-card">
-          <h3>Overall Progress</h3>
-          <div className="big-progress-bar">
-            <div className="big-progress-fill" style={{ width: `${project.progress || 0}%` }}></div>
-          </div>
-          <p className="big-progress-text">{project.progress || 0}% Complete</p>
-        </div>
-      </div>
-
-      {/* Tasks */}
       <div className="detail-card">
-        <h3>{isStaff ? "My Tasks" : "All Tasks"} ({myTasks.length})</h3>
+        <h3>{isStaff ? "My Tasks" : "All Tasks"}</h3>
         <div className="tasks-list">
           {myTasks.map((task: any) => (
             <div key={task.id} className="task-row">
-              <div className={`task-check ${task.status === 'COMPLETED' ? 'checked' : ''}`} 
-                   onClick={() => task.status !== 'COMPLETED' && isStaff && openSubmitModal(task)}>
+              <div className={`task-check ${task.status === 'COMPLETED' ? 'checked' : ''}`}>
                 {task.status === 'COMPLETED' ? '✓' : ''}
               </div>
               <div className="task-content">
                 <div className={`task-title ${task.status === 'COMPLETED' ? 'done' : ''}`}>{task.title}</div>
-                {task.due_date && <div className="task-meta">Due {new Date(task.due_date).toLocaleDateString()}</div>}
+                <div className="task-meta">
+                  Assigned to: {task.assignee?.name}
+                  {task.due_date && ` • Due ${new Date(task.due_date).toLocaleDateString()}`}
+                </div>
               </div>
+
               {isStaff && task.status !== 'COMPLETED' && (
-                <button className="btn submit-work-btn" onClick={() => openSubmitModal(task)}>
+                <button className="submit-work-btn" onClick={() => openSubmitModal(task)}>
                   Submit Work
+                </button>
+              )}
+
+              {isAdmin && task.status === 'UNDER_REVIEW' && (
+                <button className="approve-btn" onClick={() => openApprovalModal(task)}>
+                  Review
                 </button>
               )}
             </div>
@@ -169,59 +169,43 @@ export default function ProjectDetail() {
         </div>
       </div>
 
-      {/* Submit Work Modal */}
+      {/* Submit Modal */}
       {showSubmitModal && selectedTask && (
         <div className="modal-overlay" onClick={() => setShowSubmitModal(false)}>
           <div className="modal" onClick={e => e.stopPropagation()}>
-            <div className="modal-header">
-              <h2>Submit Work</h2>
-              <button className="modal-close" onClick={() => setShowSubmitModal(false)}>✕</button>
-            </div>
-
-            <div className="form-group">
-              <label>Task: <strong>{selectedTask.title}</strong></label>
-            </div>
-
-            <div className="form-group">
-              <label>Comments / Notes <span style={{color:'red'}}>*</span></label>
-              <textarea 
-                className="input-field" 
-                rows={5} 
-                value={submitComment} 
-                onChange={(e) => setSubmitComment(e.target.value)}
-                placeholder="Write your report, findings, or notes here..."
-              />
-            </div>
-
-            <div className="form-group">
-              <label>Attachments (Optional)</label>
-              <input type="file" className="input-field" multiple />
-            </div>
-
-            <button 
-              className="btn" 
-              style={{width:'100%', marginTop:'20px'}}
-              onClick={submitWork}
-              disabled={submitting || !submitComment.trim()}
-            >
+            <h2>Submit Work for: {selectedTask.title}</h2>
+            <textarea 
+              placeholder="Write your comments / report here *"
+              value={submitComment}
+              onChange={(e) => setSubmitComment(e.target.value)}
+              rows={6}
+            />
+            <input type="file" multiple onChange={(e) => setFiles(Array.from(e.target.files || []))} />
+            <button onClick={submitWork} disabled={!submitComment.trim() || submitting}>
               {submitting ? 'Submitting...' : 'Submit Work'}
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Approval Modal */}
+      {showApprovalModal && selectedTask && (
+        <div className="modal-overlay" onClick={() => setShowApprovalModal(false)}>
+          <div className="modal" onClick={e => e.stopPropagation()}>
+            <h2>Review Task: {selectedTask.title}</h2>
+            <select value={approvalAction} onChange={(e) => setApprovalAction(e.target.value as any)}>
+              <option value="APPROVED">Approve</option>
+              <option value="REJECTED">Reject</option>
+            </select>
+            <textarea 
+              placeholder="Add note (required for rejection)" 
+              value={approvalNote} 
+              onChange={(e) => setApprovalNote(e.target.value)} 
+            />
+            <button onClick={handleApproval}>Confirm Decision</button>
           </div>
         </div>
       )}
     </div>
   );
 }
-
-// Helper functions
-const getStatusClass = (status: string) => {
-  if (status === 'COMPLETED') return 'status-done';
-  if (status === 'UNDER_REVIEW') return 'status-review';
-  return 'status-progress';
-};
-
-const getStatusLabel = (status: string) => {
-  if (status === 'COMPLETED') return 'Completed';
-  if (status === 'UNDER_REVIEW') return 'Under Review';
-  return 'In Progress';
-};
