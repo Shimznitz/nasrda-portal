@@ -17,7 +17,7 @@ export default function ProjectDetail() {
   const [userRole, setUserRole] = useState<string>('');
   const [loading, setLoading] = useState(true);
 
-  // Submit modal
+  // Submit Modal
   const [showSubmitModal, setShowSubmitModal] = useState(false);
   const [selectedTask, setSelectedTask] = useState<any>(null);
   const [submitComment, setSubmitComment] = useState('');
@@ -33,7 +33,6 @@ export default function ProjectDetail() {
     const { data: { user } } = await supabase.auth.getUser();
     if (user) setCurrentUserId(user.id);
 
-    // Get Project
     const { data: proj } = await supabase
       .from('projects')
       .select('*, centres(name, location)')
@@ -42,20 +41,17 @@ export default function ProjectDetail() {
 
     setProject(proj);
 
-    // FIXED: Simple query first, then fetch profiles separately if needed
     const { data: taskData } = await supabase
       .from('tasks')
       .select(`
         *,
-        assigned_to,
-        profiles:assigned_to (id, name, designation)
+        profiles!assigned_to (id, name, designation)
       `)
       .eq('project_id', projectId)
       .order('created_at', { ascending: false });
 
     setTasks(taskData || []);
 
-    // Get user role
     if (user) {
       const { data: prof } = await supabase
         .from('profiles')
@@ -68,9 +64,7 @@ export default function ProjectDetail() {
     setLoading(false);
   };
 
-  const isAdmin = ['SUPER_ADMIN', 'CENTRE_ADMIN', 'DIVISION_HEAD', 'UNIT_HEAD', 'DEPT_HEAD'].includes(userRole);
   const isStaff = userRole === 'STAFF';
-
   const visibleTasks = isStaff 
     ? tasks.filter(t => t.assigned_to === currentUserId)
     : tasks;
@@ -99,7 +93,7 @@ export default function ProjectDetail() {
 
     setShowSubmitModal(false);
     setSubmitting(false);
-    fetchProjectData();
+    fetchProjectData();   // Refresh to update progress
   };
 
   if (loading) return <div className="loading-full">Loading project...</div>;
@@ -137,10 +131,10 @@ export default function ProjectDetail() {
         
         <div className="tasks-list">
           {visibleTasks.length === 0 ? (
-            <p className="no-tasks">No tasks assigned yet.</p>
+            <p className="no-tasks">No tasks assigned to you yet.</p>
           ) : (
             visibleTasks.map((task: any) => (
-              <div key={task.id} className="task-row">
+              <div key={task.id} className="task-row" onClick={() => openSubmitModal(task)}>
                 <div className={`task-check ${task.status === 'COMPLETED' ? 'checked' : ''}`}>
                   {task.status === 'COMPLETED' ? '✓' : ''}
                 </div>
@@ -149,13 +143,12 @@ export default function ProjectDetail() {
                   <div className="task-meta">
                     Assigned to: {task.profiles?.name || 'Unassigned'}
                     {task.due_date && ` • Due ${new Date(task.due_date).toLocaleDateString()}`}
+                    {task.status === 'UNDER_REVIEW' && <span className="review-tag">● Under Review</span>}
                   </div>
                 </div>
 
                 {isStaff && task.status !== 'COMPLETED' && (
-                  <button className="submit-work-btn" onClick={() => openSubmitModal(task)}>
-                    Submit Work
-                  </button>
+                  <button className="submit-work-btn">Submit Work</button>
                 )}
               </div>
             ))
@@ -173,16 +166,22 @@ export default function ProjectDetail() {
             </div>
 
             <p><strong>Task:</strong> {selectedTask.title}</p>
+            {selectedTask.due_date && (
+              <p><strong>Due:</strong> {new Date(selectedTask.due_date).toLocaleDateString()}</p>
+            )}
 
             <textarea
               className="input-field"
-              rows={5}
-              placeholder="Write your comments / report *"
+              rows={6}
+              placeholder="Write your comments, findings, or report here *"
               value={submitComment}
               onChange={(e) => setSubmitComment(e.target.value)}
             />
 
-            <input type="file" multiple className="input-field" />
+            <div className="form-group">
+              <label>Attachments (Optional)</label>
+              <input type="file" multiple className="input-field" />
+            </div>
 
             <button 
               className="btn" 

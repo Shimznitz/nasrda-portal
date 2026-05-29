@@ -95,11 +95,18 @@
   padding: 18px 22px;
   border-radius: 14px;
   border: 1px solid var(--border);
+  cursor: pointer;
   transition: all 0.2s;
 }
 
 .task-row:hover {
   border-color: var(--gold);
+}
+
+.review-tag {
+  color: #ff9800;
+  font-weight: 600;
+  margin-left: 8px;
 }
 
 .task-check {
@@ -161,6 +168,7 @@
 
 .submit-work-btn:hover,
 .approve-btn:hover {
+  background: var(--gold2);
   transform: translateY(-1px);
 }
 
