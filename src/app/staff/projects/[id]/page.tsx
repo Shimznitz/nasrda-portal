@@ -33,7 +33,7 @@ export default function ProjectDetail() {
     const { data: { user } } = await supabase.auth.getUser();
     if (user) setCurrentUserId(user.id);
 
-    // Get project
+    // Get Project
     const { data: proj } = await supabase
       .from('projects')
       .select('*, centres(name, location)')
@@ -42,13 +42,13 @@ export default function ProjectDetail() {
 
     setProject(proj);
 
-    // FIXED TASKS QUERY
+    // FIXED: Simple query first, then fetch profiles separately if needed
     const { data: taskData } = await supabase
       .from('tasks')
       .select(`
         *,
-        assignee:profiles!assigned_to (id, name, designation),
-        submissions (*)
+        assigned_to,
+        profiles:assigned_to (id, name, designation)
       `)
       .eq('project_id', projectId)
       .order('created_at', { ascending: false });
@@ -71,9 +71,8 @@ export default function ProjectDetail() {
   const isAdmin = ['SUPER_ADMIN', 'CENTRE_ADMIN', 'DIVISION_HEAD', 'UNIT_HEAD', 'DEPT_HEAD'].includes(userRole);
   const isStaff = userRole === 'STAFF';
 
-  // Staff sees only their tasks, Admin sees all
   const visibleTasks = isStaff 
-    ? tasks.filter(t => t.assignee?.id === currentUserId || t.assigned_to === currentUserId)
+    ? tasks.filter(t => t.assigned_to === currentUserId)
     : tasks;
 
   const openSubmitModal = (task: any) => {
@@ -134,30 +133,33 @@ export default function ProjectDetail() {
       </div>
 
       <div className="detail-card">
-        <h3>{isStaff ? "My Tasks" : "All Project Tasks"} ({visibleTasks.length})</h3>
+        <h3>{isStaff ? "My Tasks" : "All Tasks"} ({visibleTasks.length})</h3>
         
         <div className="tasks-list">
-          {visibleTasks.map((task: any) => (
-            <div key={task.id} className="task-row">
-              <div className={`task-check ${task.status === 'COMPLETED' ? 'checked' : ''}`}>
-                {task.status === 'COMPLETED' ? '✓' : ''}
-              </div>
-              <div className="task-content">
-                <div className={`task-title ${task.status === 'COMPLETED' ? 'done' : ''}`}>{task.title}</div>
-                <div className="task-meta">
-                  Assigned to: {task.assignee?.name || 'Unassigned'}
-                  {task.due_date && ` • Due ${new Date(task.due_date).toLocaleDateString()}`}
-                  {task.status === 'UNDER_REVIEW' && <span className="review-tag">● Under Review</span>}
+          {visibleTasks.length === 0 ? (
+            <p className="no-tasks">No tasks assigned yet.</p>
+          ) : (
+            visibleTasks.map((task: any) => (
+              <div key={task.id} className="task-row">
+                <div className={`task-check ${task.status === 'COMPLETED' ? 'checked' : ''}`}>
+                  {task.status === 'COMPLETED' ? '✓' : ''}
                 </div>
-              </div>
+                <div className="task-content">
+                  <div className={`task-title ${task.status === 'COMPLETED' ? 'done' : ''}`}>{task.title}</div>
+                  <div className="task-meta">
+                    Assigned to: {task.profiles?.name || 'Unassigned'}
+                    {task.due_date && ` • Due ${new Date(task.due_date).toLocaleDateString()}`}
+                  </div>
+                </div>
 
-              {isStaff && task.status !== 'COMPLETED' && (
-                <button className="submit-work-btn" onClick={() => openSubmitModal(task)}>
-                  Submit Work
-                </button>
-              )}
-            </div>
-          ))}
+                {isStaff && task.status !== 'COMPLETED' && (
+                  <button className="submit-work-btn" onClick={() => openSubmitModal(task)}>
+                    Submit Work
+                  </button>
+                )}
+              </div>
+            ))
+          )}
         </div>
       </div>
 
@@ -175,7 +177,7 @@ export default function ProjectDetail() {
             <textarea
               className="input-field"
               rows={5}
-              placeholder="Write comments / report *"
+              placeholder="Write your comments / report *"
               value={submitComment}
               onChange={(e) => setSubmitComment(e.target.value)}
             />
