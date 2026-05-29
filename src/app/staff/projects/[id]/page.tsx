@@ -126,35 +126,38 @@ export default function ProjectDetail() {
         </div>
       </div>
 
-      <div className="detail-card">
-        <h3>{isStaff ? "My Tasks" : "All Tasks"} ({visibleTasks.length})</h3>
-        
-        <div className="tasks-list">
-          {visibleTasks.length === 0 ? (
-            <p className="no-tasks">No tasks assigned to you yet.</p>
-          ) : (
-            visibleTasks.map((task: any) => (
-              <div key={task.id} className="task-row" onClick={() => openSubmitModal(task)}>
-                <div className={`task-check ${task.status === 'COMPLETED' ? 'checked' : ''}`}>
-                  {task.status === 'COMPLETED' ? '✓' : ''}
-                </div>
-                <div className="task-content">
-                  <div className={`task-title ${task.status === 'COMPLETED' ? 'done' : ''}`}>{task.title}</div>
-                  <div className="task-meta">
-                    Assigned to: {task.profiles?.name || 'Unassigned'}
-                    {task.due_date && ` • Due ${new Date(task.due_date).toLocaleDateString()}`}
-                    {task.status === 'UNDER_REVIEW' && <span className="review-tag">● Under Review</span>}
-                  </div>
-                </div>
+      {/* Tasks Section */}
+<div className="detail-card">
+  <h3>{isStaff ? "My Tasks" : "All Tasks"} ({visibleTasks.length})</h3>
+  
+  <div className="tasks-list">
+    {visibleTasks.length === 0 ? (
+      <p className="no-tasks">No tasks assigned to you yet.</p>
+    ) : (
+      visibleTasks.map((task: any) => (
+        <div key={task.id} className="task-row" onClick={() => isStaff && openSubmitModal(task)}>
+          <div className={`task-check ${task.status === 'COMPLETED' ? 'checked' : ''}`}>
+            {task.status === 'COMPLETED' ? '✓' : ''}
+          </div>
+          <div className="task-content">
+            <div className={`task-title ${task.status === 'COMPLETED' ? 'done' : ''}`}>
+              {task.title}
+            </div>
+            <div className="task-meta">
+              Assigned to: {task.profiles?.name || 'Unassigned'}
+              {task.due_date && ` • Due ${new Date(task.due_date).toLocaleDateString()}`}
+              {task.status === 'UNDER_REVIEW' && <span className="review-tag">● Under Review</span>}
+            </div>
+          </div>
 
-                {isStaff && task.status !== 'COMPLETED' && (
-                  <button className="submit-work-btn">Submit Work</button>
-                )}
-              </div>
-            ))
+          {isStaff && task.status !== 'COMPLETED' && task.status !== 'UNDER_REVIEW' && (
+            <button className="submit-work-btn">Submit Work</button>
           )}
         </div>
-      </div>
+      ))
+    )}
+  </div>
+</div>
 
       {/* Submit Work Modal */}
       {showSubmitModal && selectedTask && (
