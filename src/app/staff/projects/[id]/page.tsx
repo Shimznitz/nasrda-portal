@@ -81,16 +81,38 @@ export default function ProjectDetail() {
 
     setSubmitting(true);
 
-    await supabase.from('submissions').insert({
-      task_id: selectedTask.id,
-      submitted_by: currentUserId,
-      comment: submitComment,
-    });
+    const { data, error } = await supabase
+  .from('submissions')
+  .insert({
+    task_id: selectedTask.id,
+    submitted_by: currentUserId,
+    comment: submitComment,
+  });
 
-    await supabase.from('tasks').update({
-      status: 'UNDER_REVIEW'
-    }).eq('id', selectedTask.id);
+console.log('SUBMISSION RESULT', data);
+console.log('SUBMISSION ERROR', error);
 
+if (error) {
+  alert(error.message);
+  setSubmitting(false);
+  return;
+}
+
+    const { error: taskError } = await supabase
+  .from('tasks')
+  .update({
+    status: 'UNDER_REVIEW'
+  })
+  .eq('id', selectedTask.id);
+
+console.log('TASK UPDATE ERROR', taskError);
+
+if (taskError) {
+  alert(taskError.message);
+  setSubmitting(false);
+  return;
+}
+    alert('Work submitted successfully');
     setShowSubmitModal(false);
     setSubmitting(false);
     fetchProjectData();   // Refresh to update progress
