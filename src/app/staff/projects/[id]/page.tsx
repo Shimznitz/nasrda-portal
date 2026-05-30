@@ -91,13 +91,18 @@ setFilePreviews(previews as any);
 };
 
 const uploadFiles = async (): Promise<string[]> => {
+  const { data: session } = await supabase.auth.getSession();
+
+  if (!session?.session) {
+    throw new Error("User not authenticated");
+  }
+
   if (!files.length) return [];
 
   const uploadedUrls: string[] = [];
 
   for (const file of files) {
-    const safeName = file.name.replace(/\s/g, "_");
-    const filePath = `${projectId}/${Date.now()}-${safeName}`;
+    const filePath = `${projectId}/${Date.now()}-${file.name}`;
 
     const { error } = await supabase.storage
       .from('submissions')
