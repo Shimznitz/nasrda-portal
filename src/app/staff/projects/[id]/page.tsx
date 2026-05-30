@@ -23,7 +23,7 @@ export default function ProjectDetail() {
   const [submitting, setSubmitting] = useState(false);
 
   const [files, setFiles] = useState<File[]>([]);
-  const [filePreviews, setFilePreviews] = useState<string[]>([]);
+  const [filePreviews, setFilePreviews] = useState<any[]>([]);
 
   useEffect(() => {
     fetchProjectData();
@@ -81,8 +81,13 @@ export default function ProjectDetail() {
   const selected = Array.from(e.target.files || []);
   setFiles(selected);
 
-  const previews = selected.map(file => URL.createObjectURL(file));
-  setFilePreviews(previews);
+  const previews = selected.map(file => ({
+  url: URL.createObjectURL(file),
+  type: file.type,
+  name: file.name
+}));
+
+setFilePreviews(previews as any);
 };
 
 const uploadFiles = async (): Promise<string[]> => {
@@ -91,7 +96,8 @@ const uploadFiles = async (): Promise<string[]> => {
   const uploadedUrls: string[] = [];
 
   for (const file of files) {
-    const filePath = `${projectId}/${Date.now()}-${file.name}`;
+    const safeName = file.name.replace(/\s/g, "_");
+    const filePath = `${projectId}/${Date.now()}-${safeName}`;
 
     const { error } = await supabase.storage
       .from('submissions')
@@ -268,16 +274,22 @@ const uploadFiles = async (): Promise<string[]> => {
             />
 
             {filePreviews.length > 0 && (
-              <div className="file-preview-grid">
-                {filePreviews.map((src, i) => (
-                  <img
-                    key={i}
-                    src={src}
-                    style={{ width: 80, height: 80, objectFit: 'cover' }}
-                    />
-                  ))}
-              </div>
-            )}
+  <div className="file-preview-grid">
+    {filePreviews.map((file, i) => (
+      <div key={i} className="file-preview">
+        
+        {file.type.startsWith("image/") ? (
+          <img src={file.url} />
+        ) : (
+          <div className="file-placeholder">
+            📄 {file.name}
+          </div>
+        )}
+
+      </div>
+    ))}
+  </div>
+)}
 
             <button
               className="btn"
