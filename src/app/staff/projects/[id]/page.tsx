@@ -34,13 +34,24 @@ export default function ProjectDetail() {
       .eq('id', id)
       .single();
 
-    const { data: tasks } = await supabase
-      .from('tasks')
-      .select('*')
-      .eq('project_id', id);
+  const { data: tasks } = await supabase
+  .from('tasks')
+  .select('*')
+  .eq('project_id', id);
 
-    setProject(project);
-    setTasks(tasks || []);
+// 🔽 ADD THIS RIGHT HERE (after tasks fetch)
+const { data: submissions } = await supabase
+  .from('submissions')
+  .select('*')
+  .eq('project_id', id);
+
+// 🔽 NOW YOU ENRICH TASKS (IMPORTANT STEP)
+const enrichedTasks = (tasks || []).map(task => ({
+  ...task,
+  submission: submissions?.find(s => s.task_id === task.id) || null
+}));
+
+setTasks(enrichedTasks);
 
     const { data: prof } = await supabase
   .from('profiles')
@@ -49,11 +60,16 @@ export default function ProjectDetail() {
   .single();
 
 setProfile(prof);
+const isOwner = project?.created_by === user?.id;
 
-    const filtered =
+const sourceTasks = enrichedTasks;
+
+const filtered =
   prof?.role === 'STAFF'
-    ? (tasks || []).filter((t: any) => t.assigned_to === user?.id)
-    : (tasks || []);
+    ? sourceTasks.filter((t: any) => t.assigned_to === user?.id)
+    : isOwner
+      ? sourceTasks
+      : [];
 
 setVisibleTasks(filtered);
   };
@@ -89,6 +105,12 @@ setVisibleTasks(filtered);
   .from('tasks')
   .update({ status: 'UNDER_REVIEW' })
   .eq('id', activeTask.id);
+
+  const newSubmission = {
+  task_id: activeTask.id,
+  file_urls: uploaded,
+  description: comment,
+};
 
 // 🔥 instant UI update (no reload lag)
 setTasks(prev =>
@@ -148,10 +170,14 @@ setFile([]);
   </div>
 
   {/* ACTION */}
+  {profile?.role === 'STAFF' && (
   <button
     className="submit-work-btn"
     onClick={() => setActiveTask(task)}
-    disabled={task.status === 'UNDER_REVIEW' || task.status === 'COMPLETED'}
+    disabled={
+      task.status === 'UNDER_REVIEW' ||
+      task.status === 'COMPLETED'
+    }
   >
     {task.status === 'UNDER_REVIEW'
       ? 'Under Review'
@@ -159,6 +185,7 @@ setFile([]);
         ? 'Completed'
         : 'Submit Work'}
   </button>
+)}
 
 </div>
         ))}
