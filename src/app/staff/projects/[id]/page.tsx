@@ -12,11 +12,13 @@ export default function ProjectDetail() {
 
   const [project, setProject] = useState<any>(null);
   const [tasks, setTasks] = useState<any[]>([]);
+  const [visibleTasks, setVisibleTasks] = useState<any[]>([]);
   const [userId, setUserId] = useState<string | null>(null);
 
   const [file, setFile] = useState<File[]>([]);
   const [comment, setComment] = useState('');
   const [activeTask, setActiveTask] = useState<any>(null);
+  const [profile, setProfile] = useState<any>(null);
 
   useEffect(() => {
     load();
@@ -39,6 +41,21 @@ export default function ProjectDetail() {
 
     setProject(project);
     setTasks(tasks || []);
+
+    const { data: prof } = await supabase
+  .from('profiles')
+  .select('role')
+  .eq('id', user?.id)
+  .single();
+
+setProfile(prof);
+
+    const filtered =
+  prof?.role === 'STAFF'
+    ? (tasks || []).filter((t: any) => t.assigned_to === user?.id)
+    : (tasks || []);
+
+setVisibleTasks(filtered);
   };
 
   const submitTask = async () => {
@@ -69,14 +86,30 @@ export default function ProjectDetail() {
     });
 
     await supabase
-      .from('tasks')
-      .update({ status: 'UNDER_REVIEW' })
-      .eq('id', activeTask.id);
+  .from('tasks')
+  .update({ status: 'UNDER_REVIEW' })
+  .eq('id', activeTask.id);
 
-    await load();
-    setActiveTask(null);
-    setComment('');
-    setFile([]);
+// 🔥 instant UI update (no reload lag)
+setTasks(prev =>
+  prev.map(t =>
+    t.id === activeTask.id
+      ? { ...t, status: 'UNDER_REVIEW' }
+      : t
+  )
+);
+
+setVisibleTasks(prev =>
+  prev.map(t =>
+    t.id === activeTask.id
+      ? { ...t, status: 'UNDER_REVIEW' }
+      : t
+  )
+);
+
+setActiveTask(null);
+setComment('');
+setFile([]);
   };
 
   if (!project) return <p>Loading...</p>;
@@ -87,14 +120,47 @@ export default function ProjectDetail() {
       <h1>{project.title}</h1>
 
       <div className="tasks-list">
-        {tasks.map(task => (
+        {visibleTasks.map(task => (
           <div key={task.id} className="task-row">
-            <div>{task.title}</div>
 
-            <button onClick={() => setActiveTask(task)}>
-              Submit
-            </button>
-          </div>
+  {/* STATUS INDICATOR */}
+  <div
+    className={`task-check ${
+      task.status === 'UNDER_REVIEW' || task.status === 'COMPLETED'
+        ? 'checked'
+        : ''
+    }`}
+  >
+    {task.status === 'UNDER_REVIEW' || task.status === 'COMPLETED' ? '✓' : ''}
+  </div>
+
+  {/* TASK CONTENT */}
+  <div className="task-content">
+    <div className={`task-title ${
+      task.status === 'COMPLETED' ? 'done' : ''
+    }`}>
+      {task.title}
+    </div>
+
+    <div className="task-meta">
+      Status: {task.status}
+    </div>
+  </div>
+
+  {/* ACTION */}
+  <button
+    className="submit-work-btn"
+    onClick={() => setActiveTask(task)}
+    disabled={task.status === 'UNDER_REVIEW' || task.status === 'COMPLETED'}
+  >
+    {task.status === 'UNDER_REVIEW'
+      ? 'Under Review'
+      : task.status === 'COMPLETED'
+        ? 'Completed'
+        : 'Submit Work'}
+  </button>
+
+</div>
         ))}
       </div>
 
@@ -102,7 +168,16 @@ export default function ProjectDetail() {
         <div className="modal-overlay">
           <div className="modal">
 
-            <h2>Submit Work</h2>
+            <div className="modal-header">
+  <h2>Submit Work</h2>
+
+  <button
+    className="modal-close-btn"
+    onClick={() => setActiveTask(null)}
+  >
+    ✕
+  </button>
+</div>
 
             <textarea
               className="input-field"
