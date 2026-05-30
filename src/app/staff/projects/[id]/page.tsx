@@ -19,59 +19,72 @@ export default function ProjectDetail() {
   const [comment, setComment] = useState('');
   const [activeTask, setActiveTask] = useState<any>(null);
   const [profile, setProfile] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     load();
   }, [id]);
 
   const load = async () => {
+    setLoading(true);
+
     const { data: { user } } = await supabase.auth.getUser();
     setUserId(user?.id || null);
 
-    const { data: project } = await supabase
+    const { data: project, error: projectError } = await supabase
       .from('projects')
       .select('*')
       .eq('id', id)
       .single();
 
-  const { data: tasks } = await supabase
-  .from('tasks')
-  .select('*')
-  .eq('project_id', id);
+    if (projectError) {
+      console.error("PROJECT ERROR:", projectError);
+      setProject(null);
+      setLoading(false);
+      return;
+    }
 
-// 🔽 ADD THIS RIGHT HERE (after tasks fetch)
-const { data: submissions } = await supabase
-  .from('submissions')
-  .select('*')
-  .eq('project_id', id);
+    setProject(project);
 
-// 🔽 NOW YOU ENRICH TASKS (IMPORTANT STEP)
-const enrichedTasks = (tasks || []).map(task => ({
-  ...task,
-  submission: submissions?.find(s => s.task_id === task.id) || null
-}));
+    const { data: tasks } = await supabase
+      .from('tasks')
+      .select('*')
+      .eq('project_id', id);
 
-setTasks(enrichedTasks);
+    const { data: submissions } = await supabase
+      .from('submissions')
+      .select('*')
+      .eq('project_id', id);
+
+    const enrichedTasks = (tasks || []).map(task => ({
+      ...task,
+      submission: submissions?.find(s => s.task_id === task.id) || null
+    }));
+
+    setTasks(enrichedTasks);
 
     const { data: prof } = await supabase
-  .from('profiles')
-  .select('role')
-  .eq('id', user?.id)
-  .single();
+      .from('profiles')
+      .select('role')
+      .eq('id', user?.id)
+      .single();
 
-setProfile(prof);
-const isOwner = project?.created_by === user?.id;
+    setProfile(prof);
 
-const sourceTasks = enrichedTasks;
+    const isOwner = project.created_by === user?.id;
 
-const filtered =
-  prof?.role === 'STAFF'
-    ? sourceTasks.filter((t: any) => t.assigned_to === user?.id)
-    : isOwner
-      ? sourceTasks
-      : [];
+    const sourceTasks = enrichedTasks;
 
-setVisibleTasks(filtered);
+    const filtered =
+      prof?.role === 'STAFF'
+        ? sourceTasks.filter((t: any) => t.assigned_to === user?.id)
+        : isOwner
+          ? sourceTasks
+          : [];
+
+    setVisibleTasks(filtered);
+
+    setLoading(false);
   };
 
   const submitTask = async () => {
@@ -82,9 +95,14 @@ setVisibleTasks(filtered);
     for (const f of file) {
       const path = `${id}/${Date.now()}-${f.name}`;
 
-      await supabase.storage
+      const { error: uploadError } = await supabase.storage
         .from('submissions')
         .upload(path, f);
+
+      if (uploadError) {
+        console.error(uploadError);
+        return;
+      }
 
       const { data } = supabase.storage
         .from('submissions')
@@ -93,7 +111,7 @@ setVisibleTasks(filtered);
       uploaded.push(data.publicUrl);
     }
 
-    await supabase.from('submissions').insert({
+    const { error: insertError } = await supabase.from('submissions').insert({
       project_id: id,
       task_id: activeTask.id,
       submitted_by: userId,
@@ -101,40 +119,45 @@ setVisibleTasks(filtered);
       file_urls: uploaded
     });
 
+    if (insertError) {
+      console.error(insertError);
+      return;
+    }
+
     await supabase
-  .from('tasks')
-  .update({ status: 'UNDER_REVIEW' })
-  .eq('id', activeTask.id);
+      .from('tasks')
+      .update({ status: 'UNDER_REVIEW' })
+      .eq('id', activeTask.id);
 
-  const newSubmission = {
-  task_id: activeTask.id,
-  file_urls: uploaded,
-  description: comment,
-};
+    const newSubmission = {
+      task_id: activeTask.id,
+      file_urls: uploaded,
+      description: comment,
+    };
 
-// 🔥 instant UI update (no reload lag)
-setTasks(prev =>
-  prev.map(t =>
-    t.id === activeTask.id
-      ? { ...t, status: 'UNDER_REVIEW' }
-      : t
-  )
-);
+    setTasks(prev =>
+      prev.map(t =>
+        t.id === activeTask.id
+          ? { ...t, status: 'UNDER_REVIEW', submission: newSubmission }
+          : t
+      )
+    );
 
-setVisibleTasks(prev =>
-  prev.map(t =>
-    t.id === activeTask.id
-      ? { ...t, status: 'UNDER_REVIEW' }
-      : t
-  )
-);
+    setVisibleTasks(prev =>
+      prev.map(t =>
+        t.id === activeTask.id
+          ? { ...t, status: 'UNDER_REVIEW', submission: newSubmission }
+          : t
+      )
+    );
 
-setActiveTask(null);
-setComment('');
-setFile([]);
+    setActiveTask(null);
+    setComment('');
+    setFile([]);
   };
 
-  if (!project) return <p>Loading...</p>;
+  if (loading) return <p>Loading...</p>;
+  if (!project) return <p>Project not found</p>;
 
   return (
     <div className="project-detail-page">
@@ -145,49 +168,49 @@ setFile([]);
         {visibleTasks.map(task => (
           <div key={task.id} className="task-row">
 
-  {/* STATUS INDICATOR */}
-  <div
-    className={`task-check ${
-      task.status === 'UNDER_REVIEW' || task.status === 'COMPLETED'
-        ? 'checked'
-        : ''
-    }`}
-  >
-    {task.status === 'UNDER_REVIEW' || task.status === 'COMPLETED' ? '✓' : ''}
-  </div>
+            {/* STATUS INDICATOR */}
+            <div
+              className={`task-check ${
+                task.status === 'UNDER_REVIEW' || task.status === 'COMPLETED'
+                  ? 'checked'
+                  : ''
+              }`}
+            >
+              {task.status === 'UNDER_REVIEW' || task.status === 'COMPLETED' ? '✓' : ''}
+            </div>
 
-  {/* TASK CONTENT */}
-  <div className="task-content">
-    <div className={`task-title ${
-      task.status === 'COMPLETED' ? 'done' : ''
-    }`}>
-      {task.title}
-    </div>
+            {/* TASK CONTENT */}
+            <div className="task-content">
+              <div className={`task-title ${
+                task.status === 'COMPLETED' ? 'done' : ''
+              }`}>
+                {task.title}
+              </div>
 
-    <div className="task-meta">
-      Status: {task.status}
-    </div>
-  </div>
+              <div className="task-meta">
+                Status: {task.status}
+              </div>
+            </div>
 
-  {/* ACTION */}
-  {profile?.role === 'STAFF' && (
-  <button
-    className="submit-work-btn"
-    onClick={() => setActiveTask(task)}
-    disabled={
-      task.status === 'UNDER_REVIEW' ||
-      task.status === 'COMPLETED'
-    }
-  >
-    {task.status === 'UNDER_REVIEW'
-      ? 'Under Review'
-      : task.status === 'COMPLETED'
-        ? 'Completed'
-        : 'Submit Work'}
-  </button>
-)}
+            {/* ACTION */}
+            {profile?.role === 'STAFF' && (
+              <button
+                className="submit-work-btn"
+                onClick={() => setActiveTask(task)}
+                disabled={
+                  task.status === 'UNDER_REVIEW' ||
+                  task.status === 'COMPLETED'
+                }
+              >
+                {task.status === 'UNDER_REVIEW'
+                  ? 'Under Review'
+                  : task.status === 'COMPLETED'
+                    ? 'Completed'
+                    : 'Submit Work'}
+              </button>
+            )}
 
-</div>
+          </div>
         ))}
       </div>
 
@@ -196,15 +219,15 @@ setFile([]);
           <div className="modal">
 
             <div className="modal-header">
-  <h2>Submit Work</h2>
+              <h2>Submit Work</h2>
 
-  <button
-    className="modal-close-btn"
-    onClick={() => setActiveTask(null)}
-  >
-    ✕
-  </button>
-</div>
+              <button
+                className="modal-close-btn"
+                onClick={() => setActiveTask(null)}
+              >
+                ✕
+              </button>
+            </div>
 
             <textarea
               className="input-field"
@@ -227,6 +250,7 @@ setFile([]);
           </div>
         </div>
       )}
+
     </div>
   );
 }

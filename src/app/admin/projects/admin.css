@@ -1,0 +1,70 @@
+/* src/app/admin/projects/admin.css */
+
+.admin-review {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+.task-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.task-card {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  padding: 18px;
+  border-radius: 12px;
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.task-actions button {
+  background: var(--gold);
+  border: none;
+  padding: 8px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+  margin-right: 8px;
+}
+
+.approve {
+  background: #4caf50 !important;
+  color: white;
+}
+
+.reject {
+  background: #e53935 !important;
+  color: white;
+}
+
+.pending {
+  color: #999;
+  font-size: 0.9rem;
+}
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.7);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.modal {
+  background: var(--bg2);
+  padding: 24px;
+  border-radius: 12px;
+  width: 500px;
+}
+
+.file-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 10px;
+}
