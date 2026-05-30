@@ -1,0 +1,124 @@
+.admin-page {
+  padding: 30px;
+  background: #0b0f19;
+  min-height: 100vh;
+  color: white;
+  font-family: Arial, sans-serif;
+}
+
+.title {
+  font-size: 28px;
+  margin-bottom: 20px;
+}
+
+.loading,
+.empty {
+  color: #aaa;
+  margin-top: 40px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 20px;
+}
+
+.card {
+  background: #151c2c;
+  padding: 18px;
+  border-radius: 12px;
+  border: 1px solid #26324d;
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.card h3 {
+  font-size: 16px;
+  margin: 0;
+}
+
+.status {
+  font-size: 12px;
+  padding: 4px 10px;
+  border-radius: 20px;
+  background: #333;
+}
+
+.status.PENDING {
+  background: #ffb020;
+  color: black;
+}
+
+.status.APPROVED {
+  background: #22c55e;
+}
+
+.status.REJECTED {
+  background: #ef4444;
+}
+
+.meta {
+  font-size: 13px;
+  color: #aaa;
+  margin-top: 10px;
+}
+
+.desc {
+  margin-top: 10px;
+  font-size: 14px;
+  color: #ddd;
+}
+
+.files {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.file {
+  color: #60a5fa;
+  text-decoration: none;
+  font-size: 13px;
+}
+
+.file:hover {
+  text-decoration: underline;
+}
+
+.no-files {
+  font-size: 13px;
+  color: #777;
+}
+
+.actions {
+  margin-top: 15px;
+  display: flex;
+  gap: 10px;
+}
+
+button {
+  padding: 8px 12px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: bold;
+}
+
+.approve {
+  background: #22c55e;
+  color: black;
+}
+
+.reject {
+  background: #ef4444;
+  color: white;
+}
+
+button:hover {
+  opacity: 0.85;
+}

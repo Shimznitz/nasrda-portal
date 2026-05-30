@@ -146,6 +146,21 @@ const uploadFiles = async (): Promise<string[]> => {
       return;
     }
 
+    // GET project owner (creator)
+const { data: projectData } = await supabase
+  .from('projects')
+  .select('created_by')
+  .eq('id', projectId)
+  .single();
+
+// create notification
+await supabase.from('notifications').insert({
+  user_id: projectData?.created_by,
+  title: "New Task Submission",
+  message: "A staff member has submitted work for review",
+  type: "SUBMISSION"
+});
+
     // 3. update task status
     const { error: taskError } = await supabase
       .from('tasks')

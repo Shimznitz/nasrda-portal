@@ -2,77 +2,159 @@
 'use client';
 
 import "./submit.css";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { supabase } from "@/lib/supabase";
 
 export default function SubmitWork() {
   const [file, setFile] = useState<File | null>(null);
   const [description, setDescription] = useState("");
+  const [projects, setProjects] = useState<any[]>([]);
+  const [selectedProject, setSelectedProject] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      setFile(e.target.files[0]);
-    }
+  useEffect(() => {
+    fetchProjects();
+  }, []);
+
+  const fetchProjects = async () => {
+    const { data } = await supabase.from("projects").select("id, title");
+    setProjects(data || []);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0];
+    if (!f) return;
+
+    setFile(f);
+
+    // preview (images + pdf fallback icon)
+    setPreviewUrl(URL.createObjectURL(f));
+  };
+
+  const uploadFile = async () => {
+    if (!file) return null;
+
+    const filePath = `${selectedProject}/${Date.now()}-${file.name}`;
+
+    const { error } = await supabase.storage
+      .from("submissions")
+      .upload(filePath, file);
+
+    if (error) throw error;
+
+    const { data } = supabase.storage
+      .from("submissions")
+      .getPublicUrl(filePath);
+
+    return data.publicUrl;
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!file || !description) return;
+    if (!file || !description || !selectedProject) return;
 
     setSubmitting(true);
 
-    // Simulate submission
-    setTimeout(() => {
-      alert("Work submitted successfully! (Demo)");
+    try {
+      const fileUrl = await uploadFile();
+
+      const { data: userData } = await supabase.auth.getUser();
+
+      const user = userData?.user;
+
+      // 1. create submission
+      const { error } = await supabase.from("submissions").insert({
+        project_id: selectedProject,
+        submitted_by: user?.id,
+        description,
+        file_url: fileUrl,
+      });
+
+      if (error) throw error;
+
+      // 2. notification for admin/creator
+      const { data: project } = await supabase
+        .from("projects")
+        .select("created_by")
+        .eq("id", selectedProject)
+        .single();
+
+      if (project?.created_by) {
+        await supabase.from("notifications").insert({
+          user_id: project.created_by,
+          title: "New Submission",
+          body: "A task has been submitted for review",
+          type: "submission",
+          read: false,
+          link: `/admin/submissions`,
+        });
+      }
+
+      alert("Work submitted successfully");
+
       setFile(null);
       setDescription("");
-      setSubmitting(false);
-    }, 1500);
+      setSelectedProject("");
+      setPreviewUrl(null);
+    } catch (err: any) {
+      alert(err.message);
+    }
+
+    setSubmitting(false);
   };
 
   return (
     <div className="submit-page">
-      <div className="page-header">
-        <h1>Submit Work</h1>
-        <p>Upload your deliverables or progress report</p>
-      </div>
-
       <div className="submit-card">
+        <h1>Submit Work</h1>
+
         <form onSubmit={handleSubmit}>
           <div className="form-group">
             <label>Project</label>
-            <select className="select-input">
-              <option>Propulsion System Upgrade</option>
-              <option>Satellite Ground Station Maintenance</option>
+            <select
+              value={selectedProject}
+              onChange={(e) => setSelectedProject(e.target.value)}
+              required
+            >
+              <option value="">Select project</option>
+              {projects.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.title}
+                </option>
+              ))}
             </select>
           </div>
 
           <div className="form-group">
-            <label>Description / Notes</label>
+            <label>Description</label>
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="Brief description of what you are submitting..."
               rows={5}
+              placeholder="What did you do?"
+              required
             />
           </div>
 
           <div className="form-group">
-            <label>Upload File</label>
-            <div className="file-upload-area">
-              <input
-                type="file"
-                onChange={handleFileChange}
-                id="file-upload"
-                className="hidden"
-              />
-              <label htmlFor="file-upload" className="upload-label">
-                {file ? file.name : "Click to select file or drag & drop"}
-              </label>
-            </div>
+            <label>File</label>
+            <input type="file" onChange={handleFileChange} />
+
+            {previewUrl && (
+              <div className="preview-box">
+                {file?.type.startsWith("image") ? (
+                  <img src={previewUrl} />
+                ) : (
+                  <a href={previewUrl} target="_blank">
+                    Preview File
+                  </a>
+                )}
+              </div>
+            )}
           </div>
 
-          <button type="submit" disabled={submitting || !file || !description} className="submit-btn">
+          <button disabled={submitting} type="submit">
             {submitting ? "Submitting..." : "Submit Work"}
           </button>
         </form>
