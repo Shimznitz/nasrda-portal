@@ -34,8 +34,9 @@ export default function ProfilePage() {
     <div className="profile-page">
       <div className="profile-header">
         <div className="profile-avatar-large">
-          {profile.name?.slice(0, 2).toUpperCase() || 'NA'}
+          {(profile.name?.slice(0, 2).toUpperCase()) || 'NA'}
         </div>
+
         <div>
           <h1>{profile.name}</h1>
           <p className="designation">{profile.designation}</p>
@@ -46,21 +47,25 @@ export default function ProfilePage() {
       <div className="profile-content">
         <div className="info-card">
           <h3>Personal Information</h3>
+
           <div className="info-grid">
             <div className="info-item">
               <span className="label">Email</span>
               <span className="value">{profile.email}</span>
             </div>
+
             <div className="info-item">
               <span className="label">Role</span>
               <span className="value role-badge">{profile.role}</span>
             </div>
+
             {profile.centre_name && (
               <div className="info-item">
                 <span className="label">Centre</span>
                 <span className="value">{profile.centre_name}</span>
               </div>
             )}
+
             {profile.division_name && (
               <div className="info-item">
                 <span className="label">Division</span>
@@ -73,11 +78,12 @@ export default function ProfilePage() {
         <div className="quick-stats">
           <div className="stat-box">
             <div className="stat-number">12</div>
-            <div className="stat-label">Projects Participated</div>
+            <div className="stat-label">Projects</div>
           </div>
+
           <div className="stat-box">
             <div className="stat-number">87%</div>
-            <div className="stat-label">Average Completion</div>
+            <div className="stat-label">Completion</div>
           </div>
         </div>
       </div>
