@@ -362,3 +362,23 @@ select.input-field { cursor: pointer; }
 .task-meta { font-size: 0.78rem; color: var(--text3); margin-top: 2px; }
 
 .error { color: #e05c5c; font-size: 0.88rem; margin-bottom: 12px; }
+
+.projects-page {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 40px 24px;
+}
+
+.project-brief-desc {
+  color: var(--text3, #8a99ad);
+  font-size: 0.95rem;
+  margin-bottom: 20px;
+  line-height: 1.5;
+}
+
+/* Inherits clean base rules from your theme configuration vars */
+.projects-list {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}

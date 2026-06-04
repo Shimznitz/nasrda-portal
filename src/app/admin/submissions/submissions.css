@@ -1,124 +1,127 @@
 .admin-page {
-  padding: 30px;
+  padding: 40px;
   background: #0b0f19;
   min-height: 100vh;
   color: white;
-  font-family: Arial, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }
 
 .title {
-  font-size: 28px;
-  margin-bottom: 20px;
-}
-
-.loading,
-.empty {
-  color: #aaa;
-  margin-top: 40px;
+  font-size: 32px;
+  margin-bottom: 24px;
+  font-weight: 700;
 }
 
 .grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-  gap: 20px;
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  gap: 24px;
 }
 
 .card {
   background: #151c2c;
-  padding: 18px;
+  padding: 24px;
   border-radius: 12px;
   border: 1px solid #26324d;
+  display: flex;
+  flex-direction: column;
 }
 
 .card-header {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 12px;
 }
 
 .card h3 {
-  font-size: 16px;
+  font-size: 1.1rem;
   margin: 0;
+  color: #fff;
 }
 
 .status {
-  font-size: 12px;
+  font-size: 11px;
   padding: 4px 10px;
   border-radius: 20px;
-  background: #333;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+.status.PENDING { background: #ffb020; color: #000; }
+.status.APPROVED { background: #22c55e; color: #000; }
+.status.REJECTED { background: #ef4444; color: #fff; }
+
+.meta { font-size: 13px; color: #8a99ad; margin-bottom: 10px; }
+.desc-preview { color: #ccd6e0; font-size: 0.9rem; line-height: 1.5; margin-bottom: 18px; flex: 1; }
+
+.evaluate-trigger-btn {
+  background: transparent;
+  border: 1px solid #c9a84c;
+  color: #c9a84c;
+  padding: 10px;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.evaluate-trigger-btn:hover { background: #c9a84c; color: #000; }
+
+/* Modal Styles */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.85);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 2000;
 }
 
-.status.PENDING {
-  background: #ffb020;
-  color: black;
+.modal-view {
+  background: #151c2c;
+  border: 1px solid #26324d;
+  border-radius: 16px;
+  padding: 32px;
+  width: 600px;
+  max-width: 90vw;
 }
 
-.status.APPROVED {
-  background: #22c55e;
-}
-
-.status.REJECTED {
-  background: #ef4444;
-}
-
-.meta {
-  font-size: 13px;
-  color: #aaa;
-  margin-top: 10px;
-}
-
-.desc {
-  margin-top: 10px;
-  font-size: 14px;
-  color: #ddd;
-}
-
-.files {
-  margin-top: 12px;
+.inspect-group {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-}
-
-.file {
-  color: #60a5fa;
-  text-decoration: none;
-  font-size: 13px;
-}
-
-.file:hover {
-  text-decoration: underline;
-}
-
-.no-files {
-  font-size: 13px;
-  color: #777;
-}
-
-.actions {
-  margin-top: 15px;
-  display: flex;
   gap: 10px;
+  margin-top: 20px;
 }
 
-button {
-  padding: 8px 12px;
-  border: none;
+.inspect-group label {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  color: #8a99ad;
+  letter-spacing: 0.5px;
+  font-weight: 600;
+}
+
+.inspect-text { font-size: 1.2rem; color: #fff; margin-bottom: 12px; }
+.inspect-desc-box { background: #0b0f19; padding: 14px; border-radius: 8px; color: #d1dbe5; font-size: 0.95rem; line-height: 1.6; }
+.inspect-files { display: flex; flex-direction: column; gap: 8px; margin: 8px 0 16px 0; }
+.file-token { color: #60a5fa; text-decoration: none; font-size: 0.9rem; }
+.file-token:hover { text-decoration: underline; }
+.inspect-divider { border: 0; border-top: 1px solid #26324d; margin: 16px 0; }
+
+.feedback-entry {
+  background: #0b0f19;
+  border: 1px solid #26324d;
+  color: #fff;
+  padding: 14px;
   border-radius: 8px;
-  cursor: pointer;
-  font-weight: bold;
+  min-height: 120px;
+  resize: vertical;
+  font-family: inherit;
 }
 
-.approve {
-  background: #22c55e;
-  color: black;
-}
-
-.reject {
-  background: #ef4444;
-  color: white;
-}
-
-button:hover {
-  opacity: 0.85;
-}
+.inspect-actions { display: flex; gap: 12px; margin-top: 20px; justify-content: flex-end; }
+.btn-modal { padding: 10px 18px; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; }
+.btn-modal.approve { background: #22c55e; color: #000; }
+.btn-modal.reject { background: #ef4444; color: #fff; }
+.btn-modal.close { background: #334155; color: #fff; }
