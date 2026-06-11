@@ -218,23 +218,23 @@ function CreateProjectModal({ onClose, onSuccess, profile }: any) {
     setError('');
 
     const { data: newProject, error: projError } = await supabase
-      .from('projects')
-      .insert({
-        title: form.title.trim(),
-        objectives: form.objectives.trim() || null,
-        due_date: form.due_date || null,
-        created_by: profile.id,
-        lead_id: leadId || profile.id,
-        centre_id: profile.centre_id || null,
-        division_id: profile.division_id || null,
-        dept_scope_id: profile.department_id || null,
-        div_scope_id: profile.division_id || null,
-        unit_scope_id: profile.unit_id || null,
-        status: 'ACTIVE',
-        progress: 0,
-      })
-      .select()
-      .single();
+  .from('projects')
+  .insert({
+    title: form.title.trim(),
+    objectives: form.objectives.trim() || null,
+    due_date: form.due_date || null,
+    created_by: profile.id,
+    lead_id: leadId || profile.id,
+    centre_id: profile.centre_id || null,
+    division_id: profile.division_id || null,
+    dept_scope_id: profile.department_id || null,
+    div_scope_id: profile.division_id || null,
+    unit_scope_id: profile.unit_id || null,
+    progress: 0,
+    // No status field — let the DB column default handle it
+  })
+  .select()
+  .single();
 
     if (projError || !newProject) {
       setError(projError?.message || 'Failed to create project.');
