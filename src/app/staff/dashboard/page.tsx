@@ -1,214 +1,300 @@
 /* src/app/staff/dashboard/page.tsx */
+
 'use client';
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { useRouter } from "next/navigation";
 import "./dashboard.css";
 
+function getGreeting() {
+  const h = new Date().getHours();
+  if (h < 12) return 'Good morning';
+  if (h < 17) return 'Good afternoon';
+  return 'Good evening';
+}
+
+function formatRole(role: string) {
+  return role?.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()) ?? '';
+}
+
 export default function StaffDashboard() {
+  const router = useRouter();
   const [userProfile, setUserProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  
-  // Dynamic Operational States
-  const [deptInfo, setDeptInfo] = useState<any>(null);
-  const [analytics, setAnalytics] = useState({ staffCount: 0, activeProjects: 0, pendingTasks: 0 });
-  const [departmentProjects, setDepartmentProjects] = useState<any[]>([]);
-  const [dispatchedTasks, setDispatchedTasks] = useState<any[]>([]);
 
-  // Triage States for DG
-  const [unassignedStaff, setUnassignedStaff] = useState<any[]>([]);
-  const [allDepartments, setAllDepartments] = useState<any[]>([]);
+  // Shared
+  const [myProjects, setMyProjects] = useState<any[]>([]);
+  const [myTasks, setMyTasks] = useState<any[]>([]);
+
+  // Manager/Admin extras
+  const [analytics, setAnalytics] = useState({ staffCount: 0, activeProjects: 0, pendingTasks: 0 });
+  const [scopeName, setScopeName] = useState('');
 
   useEffect(() => {
-    const loadDashboardSession = async () => {
-      setLoading(true);
+    loadDashboard();
+  }, []);
+
+  const loadDashboard = async () => {
+    setLoading(true);
+    try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single();
+
+      if (!profile) return;
       setUserProfile(profile);
 
-      // If DG/ADMIN, fetch Triage Data
-      if (profile?.role === 'DG' || profile?.role === 'ADMIN') {
-        const { data: unassigned } = await supabase.from('profiles').select('id, name, email, designation').is('department_id', null);
-        const { data: depts } = await supabase.from('departments').select('id, name');
-        setUnassignedStaff(unassigned || []);
-        setAllDepartments(depts || []);
+      const isPrivileged =
+        profile.role === 'SUPER_ADMIN' ||
+        profile.role === 'DG' ||
+        profile.role?.includes('ADMIN') ||
+        profile.role === 'DIVISION_HEAD' ||
+        profile.role === 'UNIT_HEAD' ||
+        profile.role === 'CENTRE_HEAD';
+
+      // ── My projects (via membership) ──────────────────────────
+      const { data: memberships } = await supabase
+        .from('project_members')
+        .select('project_id')
+        .eq('profile_id', user.id);
+
+      const memberProjectIds = memberships?.map((m: any) => m.project_id) ?? [];
+
+      // ── Privileged: also fetch scoped projects ─────────────────
+      let scopedProjectIds: string[] = [];
+      if (isPrivileged) {
+        const conditions: string[] = [`created_by.eq.${profile.id}`];
+        if (profile.centre_id)     conditions.push(`centre_id.eq.${profile.centre_id}`);
+        if (profile.division_id)   conditions.push(`div_scope_id.eq.${profile.division_id}`, `division_id.eq.${profile.division_id}`);
+        if (profile.department_id) conditions.push(`dept_scope_id.eq.${profile.department_id}`);
+        if (profile.unit_id)       conditions.push(`unit_scope_id.eq.${profile.unit_id}`);
+
+        const { data: scopedProjects } = await supabase
+          .from('projects')
+          .select('id')
+          .or(conditions.join(','));
+
+        scopedProjectIds = scopedProjects?.map((p: any) => p.id) ?? [];
       }
 
-      // If DEPT_ADMIN, fetch existing telemetry
-      if (profile?.role === 'DEPT_ADMIN') {
-        const { data: dept } = await supabase.from('departments').select('*').eq('head_id', profile.id).single();
-        if (dept) {
-          setDeptInfo(dept);
-          // ... (Your existing telemetry queries remain here)
+      const allProjectIds = [...new Set([...memberProjectIds, ...scopedProjectIds])];
+
+      if (allProjectIds.length > 0) {
+        const { data: projects } = await supabase
+          .from('projects')
+          .select('id, title, status, progress, due_date, created_by')
+          .in('id', allProjectIds)
+          .order('created_at', { ascending: false })
+          .limit(5);
+        setMyProjects(projects ?? []);
+      }
+
+      // ── My tasks (via project_members → tasks) ─────────────────
+      if (memberProjectIds.length > 0) {
+        const { data: tasks } = await supabase
+          .from('tasks')
+          .select('id, title, status, due_date, project_id, projects(title)')
+          .in('project_id', memberProjectIds)
+          .eq('assigned_to', user.id)
+          .neq('status', 'COMPLETED')
+          .order('due_date', { ascending: true })
+          .limit(6);
+        setMyTasks(tasks ?? []);
+      }
+
+      // ── Analytics for privileged roles ─────────────────────────
+      if (isPrivileged) {
+        // Scope name
+        if (profile.role === 'DG' || profile.role === 'SUPER_ADMIN') {
+          setScopeName('National Space Research and Development Agency');
+        } else if (profile.centre_id) {
+          const { data: c } = await supabase.from('centres').select('name').eq('id', profile.centre_id).single();
+          if (c) setScopeName(c.name);
+        } else if (profile.division_id) {
+          const { data: d } = await supabase.from('divisions').select('name').eq('id', profile.division_id).single();
+          if (d) setScopeName(d.name);
         }
-      }
-      setLoading(false);
-    };
-    loadDashboardSession();
-  }, []);
 
-  const handleAssign = async (profileId: string, deptId: string) => {
-    const { error } = await supabase.from('profiles').update({ department_id: deptId, role: 'DEPT_ADMIN' }).eq('id', profileId);
-    if (!error) {
-      setUnassignedStaff(prev => prev.filter(s => s.id !== profileId));
-      alert("Staff allocated to department.");
+        // Staff count in scope
+        let staffQuery = supabase.from('profiles').select('id', { count: 'exact', head: true });
+        if (profile.role !== 'DG' && profile.role !== 'SUPER_ADMIN') {
+          if (profile.centre_id)     staffQuery = staffQuery.eq('centre_id', profile.centre_id);
+          else if (profile.division_id) staffQuery = staffQuery.eq('division_id', profile.division_id);
+          else if (profile.department_id) staffQuery = staffQuery.eq('department_id', profile.department_id);
+        }
+        const { count: staffCount } = await staffQuery;
+
+        const activeProjects = allProjectIds.length;
+
+        // Pending tasks in scope
+        let pendingCount = 0;
+        if (allProjectIds.length > 0) {
+          const { count } = await supabase
+            .from('tasks')
+            .select('id', { count: 'exact', head: true })
+            .in('project_id', allProjectIds)
+            .neq('status', 'COMPLETED');
+          pendingCount = count ?? 0;
+        }
+
+        setAnalytics({
+          staffCount: staffCount ?? 0,
+          activeProjects,
+          pendingTasks: pendingCount,
+        });
+      }
+    } finally {
+      setLoading(false);
     }
   };
 
-  if (loading) return <div className="loading">Synchronizing...</div>;
-
-  // VIEW 1: DG VIEW (Now includes Triage)
-  if (userProfile?.role === 'DG' || userProfile?.role === 'ADMIN') {
+  if (loading) {
     return (
-      <div className="dashboard-page">
-        <div className="greeting">
-          <h1>Welcome back, Director General.</h1>
-          <p>National Space Research and Development Agency Executive Command Center</p>
-        </div>
-        
-        {/* Triage Section Added to your existing DG View */}
-        <div className="chart-card">
-          <div className="chart-title" style={{ marginBottom: '20px' }}>Global Staff Triage Queue</div>
-          {unassignedStaff.length === 0 ? <p>No unassigned personnel.</p> : (
-            <table style={{ width: '100%' }}>
-              <tbody>
-                {unassignedStaff.map(staff => (
-                  <tr key={staff.id}>
-                    <td>{staff.name}</td>
-                    <td>
-                      <select onChange={(e) => handleAssign(staff.id, e.target.value)}>
-                        <option value="">Assign Dept...</option>
-                        {allDepartments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-                      </select>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
-      </div>
-    );
-  }
-  // VIEW 2: DEPARTMENT HEAD VIEW (Director1 View - Fully Live Data)
-  if (userProfile?.role === 'DEPT_ADMIN') {
-    return (
-      <div className="dashboard-page">
-        
-        {/* Dynamic Structural Unit Context Banner */}
-        <div className="centre-banner">
-          <div className="centre-banner-label">Operational Management Node Active</div>
-          <div className="centre-banner-name">Department of {deptInfo?.name || 'Unassigned Sector Node'}</div>
-          <div className="centre-banner-location">📍 Core Node Location: {deptInfo?.location || 'HQ, Abuja'}</div>
-        </div>
-
-        <div className="greeting">
-          <h1>Good evening, {userProfile.name}.</h1>
-          <p>Managerial control scope for divisional personnel and asset pipelines.</p>
-        </div>
-
-        {/* Dynamic Numerical Metrics Metrics */}
-        <div className="stats-grid">
-          <div className="stat-card">
-            <div className="stat-value">{analytics.staffCount}</div>
-            <div className="stat-label">Staff Strength</div>
-            <div className="stat-hint">Active Personnel Assigned</div>
-          </div>
-          <div className="stat-card highlight">
-            <div className="stat-value">{analytics.activeProjects}</div>
-            <div className="stat-label">Sector Pipelines</div>
-            <div className="stat-hint">Active Run Schemes</div>
-          </div>
-          <div className="stat-card">
-            <div className="stat-value">{analytics.pendingTasks}</div>
-            <div className="stat-label">Dispatched Tasks</div>
-            <div className="stat-hint">Pending Subordinate Action</div>
-          </div>
-        </div>
-
-        {/* Operational Split Matrices */}
-        <div className="charts-grid">
-          
-          {/* Active Structural Project Monitor */}
-          <div className="chart-card">
-            <div className="chart-title">Active Divisional Blueprints</div>
-            <div className="mini-project-list">
-              {departmentProjects.length === 0 ? (
-                <div className="empty-state" style={{ padding: '40px 20px', fontSize: '0.9rem' }}>
-                  No active project blueprints currently logged in this sector.
-                </div>
-              ) : (
-                departmentProjects.map((project) => (
-                  <div key={project.id} className="mini-project-card">
-                    <div className="mini-project-header">
-                      <div className="mini-project-title">{project.title || project.name}</div>
-                      <span className={`status-badge ${
-                        project.status === 'COMPLETED' || project.status === 'DONE' ? 'status-done' : 
-                        project.status === 'REVIEW' ? 'status-review' : 'status-progress'
-                      }`}>
-                        {project.status || 'Active'}
-                      </span>
-                    </div>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--text3)', fontFamily: 'monospace' }}>
-                      UUID Trace: {project.id.slice(0, 8)}...
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-
-          {/* Real-time Subordinate Task Monitor */}
-          <div className="chart-card">
-            <div className="chart-title">Delegated Tasks & Subordinate Status</div>
-            <div className="tasks-list-dash">
-              {dispatchedTasks.length === 0 ? (
-                <div className="empty-state" style={{ padding: '40px 20px', fontSize: '0.9rem' }}>
-                  No delegated tasks dispatched from this command node yet.
-                </div>
-              ) : (
-                dispatchedTasks.map((task) => (
-                  <div key={task.id} className="task-row-dash">
-                    <div className={`task-check ${task.status === 'COMPLETED' ? 'checked' : ''}`}>
-                      {task.status === 'COMPLETED' ? '✓' : '!'}
-                    </div>
-                    <div className="task-info-dash">
-                      <div className={`task-title-dash ${task.status === 'COMPLETED' ? 'done' : ''}`}>
-                        {task.title}
-                      </div>
-                      <div className="task-project">
-                        Assigned to: <strong style={{ color: 'var(--text2)' }}>
-                          {task.profiles?.name || 'Unassigned Staff'}
-                        </strong> · Context: {task.projects?.title || 'General Operations'}
-                      </div>
-                      {task.due_date && (
-                        <div className="task-due">
-                          Due Date: {new Date(task.due_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-
-        </div>
+      <div className="db-loading">
+        <div className="db-loading-bar" />
+        <span>Loading dashboard…</span>
       </div>
     );
   }
 
-  // VIEW 3: FALLBACK RUN FOR BASIC EMPLOYEES
+  if (!userProfile) return null;
+
+  const isPrivileged =
+    userProfile.role === 'SUPER_ADMIN' ||
+    userProfile.role === 'DG' ||
+    userProfile.role?.includes('ADMIN') ||
+    userProfile.role === 'DIVISION_HEAD' ||
+    userProfile.role === 'UNIT_HEAD' ||
+    userProfile.role === 'CENTRE_HEAD';
+
+  const firstName = userProfile.name?.split(' ')[0] ?? 'there';
+
   return (
     <div className="dashboard-page">
-      <div className="greeting">
-        <h1>Good evening, {userProfile?.name || 'Staff Member'}.</h1>
-        <p>Personal profile operational environment logs.</p>
+
+      {/* ── Header ──────────────────────────────────── */}
+      <div className="db-header">
+        <div className="db-header-left">
+          <p className="db-eyebrow">{getGreeting()}</p>
+          <h1 className="db-title">{firstName}<span className="db-title-dot">.</span></h1>
+          <p className="db-subtitle">
+            {isPrivileged
+              ? scopeName || 'Your operational scope is active'
+              : userProfile.designation || formatRole(userProfile.role)}
+          </p>
+        </div>
+        <div className="db-role-badge">{formatRole(userProfile.role)}</div>
       </div>
-      <div className="empty-state">
-        Your assignment vectors are fully secure. Check your personal assigned lists under the <strong>My Projects</strong> control view.
+
+      {/* ── Metrics (privileged only) ────────────────── */}
+      {isPrivileged && (
+        <div className="db-metrics">
+          <div className="db-metric">
+            <div className="db-metric-value">{analytics.staffCount}</div>
+            <div className="db-metric-label">Staff in scope</div>
+          </div>
+          <div className="db-metric db-metric-accent">
+            <div className="db-metric-value">{analytics.activeProjects}</div>
+            <div className="db-metric-label">Active projects</div>
+          </div>
+          <div className="db-metric">
+            <div className="db-metric-value">{analytics.pendingTasks}</div>
+            <div className="db-metric-label">Open tasks</div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Main grid ───────────────────────────────── */}
+      <div className={`db-grid ${isPrivileged ? 'db-grid-2' : 'db-grid-1'}`}>
+
+        {/* Projects panel */}
+        <div className="db-panel">
+          <div className="db-panel-header">
+            <span className="db-panel-title">Projects</span>
+            <button className="db-panel-link" onClick={() => router.push('/staff/projects')}>
+              View all →
+            </button>
+          </div>
+
+          {myProjects.length === 0 ? (
+            <div className="db-empty">
+              <p>No projects yet.</p>
+              <button onClick={() => router.push('/staff/projects')}>Go to Projects</button>
+            </div>
+          ) : (
+            <div className="db-project-list">
+              {myProjects.map((p) => (
+                <div
+                  key={p.id}
+                  className="db-project-row"
+                  onClick={() => router.push(`/staff/projects/${p.id}`)}
+                >
+                  <div className="db-project-row-top">
+                    <span className="db-project-name">{p.title}</span>
+                    <span className={`db-status ${
+                      p.status === 'COMPLETED' ? 'db-status-done' :
+                      p.status === 'UNDER_REVIEW' || p.status === 'REVIEW' ? 'db-status-review' :
+                      'db-status-active'
+                    }`}>{p.status ?? 'ACTIVE'}</span>
+                  </div>
+                  <div className="db-progress-track">
+                    <div className="db-progress-fill" style={{ width: `${p.progress ?? 0}%` }} />
+                  </div>
+                  <div className="db-project-row-meta">
+                    <span>{p.progress ?? 0}% complete</span>
+                    {p.due_date && (
+                      <span>Due {new Date(p.due_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</span>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Tasks panel */}
+        <div className="db-panel">
+          <div className="db-panel-header">
+            <span className="db-panel-title">My Tasks</span>
+          </div>
+
+          {myTasks.length === 0 ? (
+            <div className="db-empty">
+              <p>No open tasks assigned to you.</p>
+            </div>
+          ) : (
+            <div className="db-task-list">
+              {myTasks.map((t) => {
+                const isOverdue = t.due_date && new Date(t.due_date) < new Date();
+                return (
+                  <div key={t.id} className="db-task-row">
+                    <div className={`db-task-dot ${t.status === 'UNDER_REVIEW' ? 'db-task-dot-review' : ''}`} />
+                    <div className="db-task-body">
+                      <div className="db-task-title">{t.title}</div>
+                      <div className="db-task-meta">
+                        {(t.projects as any)?.title && <span>{(t.projects as any).title}</span>}
+                        {t.due_date && (
+                          <span className={isOverdue ? 'db-overdue' : ''}>
+                            {isOverdue ? 'Overdue · ' : 'Due '}
+                            {new Date(t.due_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <span className="db-task-status">{t.status?.replace(/_/g, ' ')}</span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
       </div>
     </div>
   );

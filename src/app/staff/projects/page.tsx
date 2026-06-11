@@ -1,4 +1,5 @@
 // src/app/staff/projects/page.tsx
+
 'use client';
 
 import { useEffect, useState } from "react";
@@ -19,76 +20,74 @@ export default function StaffProjectsDashboard() {
 
   const loadData = async () => {
     setLoading(true);
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      setLoading(false);
-      return;
-    }
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
 
-    const { data: prof } = await supabase
-      .from('profiles')
-      .select('id, role, division_id, department_id, unit_id, name')
-      .eq('id', user.id)
-      .single();
+      const { data: prof } = await supabase
+        .from('profiles')
+        .select('id, role, centre_id, division_id, department_id, unit_id, name')
+        .eq('id', user.id)
+        .single();
 
-     if (!prof) {
-      setLoading(false);
-      return;
-    }  
+      if (!prof) return;
+      setProfile(prof);
 
-    setProfile(prof);
+      const isPrivileged =
+        prof.role === 'SUPER_ADMIN' ||
+        prof.role?.includes('ADMIN') ||
+        prof.role === 'DIVISION_HEAD' ||
+        prof.role === 'UNIT_HEAD' ||
+        prof.role === 'CENTRE_HEAD';
 
-    let query = supabase
-      .from('projects')
-      .select('*, creator:profiles!created_by(name)')
-      .order('created_at', { ascending: false });
+      let query = supabase
+        .from('projects')
+        .select('*, creator:profiles!created_by(name)')
+        .order('created_at', { ascending: false });
 
-    if (prof.role === 'DEPT_ADMIN' || 
-        prof.role?.includes('ADMIN') || 
-        prof.role === 'DIVISION_HEAD' || 
-        prof.role === 'UNIT_HEAD' || 
-        prof.role === 'CENTRE_HEAD') {
-
-      // Build OR condition safely (skip null values)
-    const conditions: string[] = [`created_by.eq.${prof.id}`];
-
-    if (prof.division_id) conditions.push(`div_scope_id.eq.${prof.division_id}`);
-    if (prof.department_id) conditions.push(`dept_scope_id.eq.${prof.department_id}`);
-    if (prof.unit_id) conditions.push(`unit_scope_id.${prof.unit_id}`);
-    if (prof.division_id) conditions.push(`division_id.eq.${prof.division_id}`);
-      
-      query = query.or(conditions.join(','));
-    } else {
-      // Regular staff - only see projects they are members of
-      const { data: memberships } = await supabase
-        .from('project_members')
-        .select('project_id')
-        .eq('profile_id', prof.id);   // ← Correct column
-
-      const projectIds = memberships?.map(m => m.project_id) || [];
-      console.log("User's Project IDs:", projectIds); // ← Helpful for debugging
-      
-      if (projectIds.length > 0) {
-        query = query.in('id', projectIds);
+      if (isPrivileged) {
+        const conditions: string[] = [`created_by.eq.${prof.id}`];
+        if (prof.centre_id)     conditions.push(`centre_id.eq.${prof.centre_id}`);
+        if (prof.division_id)   conditions.push(`div_scope_id.eq.${prof.division_id}`, `division_id.eq.${prof.division_id}`);
+        if (prof.department_id) conditions.push(`dept_scope_id.eq.${prof.department_id}`);
+        if (prof.unit_id)       conditions.push(`unit_scope_id.eq.${prof.unit_id}`);
+        query = query.or(conditions.join(','));
       } else {
-        setProjects([]);
-        setLoading(false);
-        return;
-      }
-    }
+        const { data: memberships } = await supabase
+          .from('project_members')
+          .select('project_id')
+          .eq('profile_id', prof.id);
 
-    const { data } = await query;
-    setProjects(data || []);
-    setLoading(false);
+        const projectIds = memberships?.map((m: any) => m.project_id) || [];
+        if (projectIds.length === 0) {
+          setProjects([]);
+          return;
+        }
+        query = query.in('id', projectIds);
+      }
+
+      const { data } = await query;
+      setProjects(data || []);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  // Better role check for "Can Create Project"
-  const canCreateProject = 
+  const canCreateProject =
     profile?.role === 'SUPER_ADMIN' ||
     profile?.role?.includes('ADMIN') ||
     profile?.role === 'DIVISION_HEAD' ||
     profile?.role === 'UNIT_HEAD' ||
     profile?.role === 'CENTRE_HEAD';
+
+  const getStatusClass = (status: string) => {
+    switch (status?.toUpperCase()) {
+      case 'COMPLETED': return 'status-done';
+      case 'UNDER_REVIEW':
+      case 'REVIEW': return 'status-review';
+      default: return 'status-progress';
+    }
+  };
 
   return (
     <div className="projects-page">
@@ -99,13 +98,13 @@ export default function StaffProjectsDashboard() {
         </div>
         {canCreateProject && (
           <button className="btn" onClick={() => setShowCreateModal(true)}>
-            + Create New Project
+            + New Project
           </button>
         )}
       </div>
 
       {loading ? (
-        <div className="loading">Loading projects...</div>
+        <div className="loading">Loading projects…</div>
       ) : projects.length === 0 ? (
         <div className="empty-state">
           <p>No projects found in your scope.</p>
@@ -120,9 +119,23 @@ export default function StaffProjectsDashboard() {
             >
               <div className="project-header">
                 <div className="project-title">{project.title}</div>
-                <div className="status-badge">{project.status || 'ACTIVE'}</div>
+                <div className={`status-badge ${getStatusClass(project.status)}`}>
+                  {project.status || 'ACTIVE'}
+                </div>
               </div>
-              <p className="project-brief-desc">{project.objectives}</p>
+
+              {project.objectives && (
+                <p className="project-brief-desc">{project.objectives}</p>
+              )}
+
+              <div className="project-meta">
+                {project.due_date && (
+                  <span>Due {new Date(project.due_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                )}
+                {project.creator?.name && (
+                  <span>By {project.creator.name}</span>
+                )}
+              </div>
 
               <div className="progress-bar">
                 <div className="progress-fill" style={{ width: `${project.progress || 0}%` }} />
@@ -136,10 +149,7 @@ export default function StaffProjectsDashboard() {
       {showCreateModal && (
         <CreateProjectModal
           onClose={() => setShowCreateModal(false)}
-          onSuccess={() => {
-            setShowCreateModal(false);
-            loadData();
-          }}
+          onSuccess={() => { setShowCreateModal(false); loadData(); }}
           profile={profile}
         />
       )}
@@ -147,202 +157,209 @@ export default function StaffProjectsDashboard() {
   );
 }
 
-/* ===================== CREATE PROJECT MODAL ===================== */
+/* ── CREATE PROJECT MODAL ─────────────────────────────────── */
 function CreateProjectModal({ onClose, onSuccess, profile }: any) {
   const [form, setForm] = useState({
     title: '',
     objectives: '',
-    start_date: '',
-    end_date: '',
+    due_date: '',
   });
 
-  const [headSearch, setHeadSearch] = useState('');
+  const [memberSearch, setMemberSearch] = useState('');
   const [searchResults, setSearchResults] = useState<any[]>([]);
-  const [selectedHead, setSelectedHead] = useState<any>(null);
   const [teamMembers, setTeamMembers] = useState<any[]>([]);
+  const [leadId, setLeadId] = useState<string | null>(null);
   const [searching, setSearching] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
-  // Search logic (same as your working divisions page)
   useEffect(() => {
     const search = async () => {
-      if (headSearch.length < 2) {
-        setSearchResults([]);
-        return;
-      }
-
+      if (memberSearch.length < 2) { setSearchResults([]); return; }
       setSearching(true);
 
       let query = supabase
         .from('profiles')
         .select('id, name, designation')
-        .ilike('name', `%${headSearch}%`)
+        .ilike('name', `%${memberSearch}%`)
+        .neq('id', profile.id)
         .limit(10);
 
-      // Scope search based on creator's role
-      if (profile.division_id) {
-        query = query.eq('division_id', profile.division_id);
-      } else if (profile.department_id) {
-        query = query.eq('department_id', profile.department_id);
-      } else if (profile.unit_id) {
-        query = query.eq('unit_id', profile.unit_id);
-      }
+      if (profile.centre_id)     query = query.eq('centre_id', profile.centre_id);
+      else if (profile.division_id)   query = query.eq('division_id', profile.division_id);
+      else if (profile.department_id) query = query.eq('department_id', profile.department_id);
+      else if (profile.unit_id)       query = query.eq('unit_id', profile.unit_id);
 
-      const { data, error } = await query;
-      if (error) console.error("Search error:", error);
-      else setSearchResults(data || []);
-
+      const { data } = await query;
+      setSearchResults(data || []);
       setSearching(false);
     };
 
     const timeout = setTimeout(search, 300);
     return () => clearTimeout(timeout);
-  }, [headSearch, profile]);
+  }, [memberSearch, profile]);
 
-  const handleSelectHead = (staff: any) => {
-    setSelectedHead(staff);
-    setHeadSearch('');
+  const addMember = (staff: any) => {
+    if (!teamMembers.some((m) => m.id === staff.id)) {
+      setTeamMembers((prev) => [...prev, staff]);
+    }
+    setMemberSearch('');
     setSearchResults([]);
   };
 
+  const removeMember = (id: string) => {
+    setTeamMembers((prev) => prev.filter((m) => m.id !== id));
+    if (leadId === id) setLeadId(null);
+  };
+
   const createProject = async () => {
-    if (!form.title.trim()) return;
+    if (!form.title.trim()) { setError('Project title is required.'); return; }
     setSaving(true);
     setError('');
 
     const { data: newProject, error: projError } = await supabase
       .from('projects')
       .insert({
-        title: form.title,
-        objectives: form.objectives,
-        start_date: form.start_date || null,
-        end_date: form.end_date || null,
+        title: form.title.trim(),
+        objectives: form.objectives.trim() || null,
+        due_date: form.due_date || null,
         created_by: profile.id,
-        division_id: profile.division_id,
-        department_id: profile.department_id,
-        unit_id: profile.unit_id,
+        lead_id: leadId || profile.id,
+        centre_id: profile.centre_id || null,
+        division_id: profile.division_id || null,
+        dept_scope_id: profile.department_id || null,
+        div_scope_id: profile.division_id || null,
+        unit_scope_id: profile.unit_id || null,
         status: 'ACTIVE',
+        progress: 0,
       })
       .select()
       .single();
 
     if (projError || !newProject) {
-      setError(projError?.message || 'Failed to create project');
+      setError(projError?.message || 'Failed to create project.');
       setSaving(false);
       return;
     }
 
-    // Add team members
-    if (teamMembers.length > 0) {
-      const payload = teamMembers.map(m => ({
+    // Insert members (creator is always added)
+    const memberRows = [
+      { project_id: newProject.id, profile_id: profile.id, is_lead: !leadId || leadId === profile.id },
+      ...teamMembers.map((m) => ({
         project_id: newProject.id,
         profile_id: m.id,
-      }));
-      await supabase.from('project_members').insert(payload);
-    }
+        is_lead: m.id === leadId,
+      })),
+    ];
 
+    await supabase.from('project_members').insert(memberRows);
     onSuccess();
   };
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-large modal" onClick={e => e.stopPropagation()}>
-        <h2>Create New Project</h2>
+      <div className="modal modal-large" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-header">
+          <h2>Create New Project</h2>
+          <button className="modal-close" onClick={onClose}>✕</button>
+        </div>
 
         {error && <p className="error">{error}</p>}
 
         <div className="form-group">
-  <label>Project Title</label>
-  <input 
-    className="input-field" 
-    value={form.title} 
-    onChange={e => setForm({...form, title: e.target.value})} 
-    required 
-  />
-</div>
+          <label>Project Title *</label>
+          <input
+            className="input-field"
+            placeholder="e.g. Q3 Research Initiative"
+            value={form.title}
+            onChange={(e) => setForm({ ...form, title: e.target.value })}
+          />
+        </div>
 
         <div className="form-group">
-  <label>Objectives</label>
-  <textarea 
-    className="input-field" 
-    rows={4} 
-    value={form.objectives} 
-    onChange={e => setForm({...form, objectives: e.target.value})} 
-  />
-</div>
-
-<div className="form-row">
-  <div className="form-group">
-    <label>Start Date</label>
-    <input 
-      type="date" 
-      className="input-field" 
-      value={form.start_date} 
-      onChange={e => setForm({...form, start_date: e.target.value})} 
-    />
-  </div>
-  <div className="form-group">
-    <label>End Date</label>
-    <input 
-      type="date" 
-      className="input-field" 
-      value={form.end_date} 
-      onChange={e => setForm({...form, end_date: e.target.value})} 
-    />
-  </div>
-</div>
+          <label>Objectives</label>
+          <textarea
+            className="input-field"
+            rows={4}
+            placeholder="Describe the goals and deliverables of this project…"
+            value={form.objectives}
+            onChange={(e) => setForm({ ...form, objectives: e.target.value })}
+          />
+        </div>
 
         <div className="form-group">
-          <label>Search & Add Team Members</label>
+          <label>Due Date</label>
+          <input
+            type="date"
+            className="input-field"
+            value={form.due_date}
+            onChange={(e) => setForm({ ...form, due_date: e.target.value })}
+          />
+        </div>
+
+        <div className="form-group" style={{ position: 'relative' }}>
+          <label>Add Team Members</label>
           <input
             type="text"
             className="input-field"
-            placeholder="Search by name..."
-            value={headSearch}
-            onChange={(e) => setHeadSearch(e.target.value)}
+            placeholder="Search by name…"
+            value={memberSearch}
+            onChange={(e) => setMemberSearch(e.target.value)}
+            autoComplete="off"
           />
-
-          {headSearch.length >= 2 && (
+          {memberSearch.length >= 2 && (
             <div className="search-results">
-              {searching && <div className="search-item muted">Searching...</div>}
+              {searching && <div className="search-item muted">Searching…</div>}
+              {!searching && searchResults.length === 0 && (
+                <div className="search-item muted">No results found.</div>
+              )}
               {searchResults.map((staff) => (
-                <div
-                  key={staff.id}
-                  className="search-item"
-                  onClick={() => {
-                    if (!teamMembers.some(m => m.id === staff.id)) {
-                      setTeamMembers([...teamMembers, staff]);
-                    }
-                  }}
-                >
+                <div key={staff.id} className="search-item" onClick={() => addMember(staff)}>
+                  <div className="search-avatar">
+                    {staff.name?.split(' ').map((n: string) => n[0]).slice(0, 2).join('').toUpperCase()}
+                  </div>
                   <div className="search-item-info">
                     <div className="search-name">{staff.name}</div>
                     <div className="search-designation">{staff.designation}</div>
                   </div>
-                  <button type="button">Add</button>
+                  <span className="add-label">+ Add</span>
                 </div>
               ))}
             </div>
           )}
         </div>
 
-        <div className="selected-members">
-          <strong>Team Members ({teamMembers.length})</strong>
-          <div className="pill-list">
-            {teamMembers.map((m) => (
-              <div key={m.id} className="pill">
-                {m.name}
-                <button onClick={() => setTeamMembers(teamMembers.filter(tm => tm.id !== m.id))}>×</button>
-              </div>
-            ))}
+        {teamMembers.length > 0 && (
+          <div className="form-group">
+            <label>Team Members — click a name to set as lead</label>
+            <div className="members-list">
+              {teamMembers.map((m) => (
+                <div key={m.id} className="member-row">
+                  <div className="search-avatar">
+                    {m.name?.split(' ').map((n: string) => n[0]).slice(0, 2).join('').toUpperCase()}
+                  </div>
+                  <div className="member-info">
+                    <div className="search-name">{m.name}</div>
+                    <div className="search-designation">{m.designation}</div>
+                  </div>
+                  <button
+                    type="button"
+                    className={`lead-btn ${leadId === m.id ? 'active' : ''}`}
+                    onClick={() => setLeadId(leadId === m.id ? null : m.id)}
+                  >
+                    {leadId === m.id ? '★ Lead' : 'Set Lead'}
+                  </button>
+                  <button type="button" className="remove-btn" onClick={() => removeMember(m.id)}>✕</button>
+                </div>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
 
         <div className="modal-actions">
           <button onClick={onClose}>Cancel</button>
-          <button onClick={createProject} disabled={saving || !form.title}>
-            {saving ? 'Creating...' : 'Create Project'}
+          <button className="btn" onClick={createProject} disabled={saving || !form.title.trim()}>
+            {saving ? 'Creating…' : 'Create Project'}
           </button>
         </div>
       </div>
