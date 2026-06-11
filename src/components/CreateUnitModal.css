@@ -1,0 +1,17 @@
+/*src/components/CreateUnitModal.css*/
+
+/* Keep these definitions at the bottom or in CreateUnitModal.css */
+.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.8); display: flex; align-items: center; justify-content: center; z-index: 1000; }
+.modal-window { background: var(--bg2); border: 1px solid var(--border); padding: 32px; border-radius: 16px; width: 100%; max-width: 500px; }
+.modal-form { display: flex; flex-direction: column; gap: 16px; }
+.form-group { margin-bottom: 16px; }
+.form-group label { display: block; font-size: 0.8rem; color: var(--text3); text-transform: uppercase; margin-bottom: 8px; }
+.input-field { width: 100%; padding: 14px; background: var(--bg3); border: 1px solid var(--border); border-radius: 10px; color: var(--text); }
+.search-wrapper { position: relative; }
+.search-results { position: absolute; top: 100%; left: 0; right: 0; background: var(--bg3); border: 1px solid var(--border); z-index: 10; border-radius: 10px; max-height: 200px; overflow-y: auto; }
+.search-item { display: flex; align-items: center; justify-content: space-between; padding: 12px; border-bottom: 1px solid var(--border); }
+.selected-head { display: flex; align-items: center; justify-content: space-between; background: var(--bg3); padding: 10px; border-radius: 8px; border: 1px solid var(--gold); }
+.remove-head-btn { background: transparent; border: 1px solid var(--border); color: var(--text3); padding: 4px 8px; border-radius: 4px; cursor: pointer; }
+.modal-actions { display: flex; justify-content: flex-end; gap: 12px; margin-top: 20px; }
+.cancel-btn { background: transparent; border: 1px solid var(--border); padding: 12px 20px; border-radius: 10px; color: var(--text3); }
+.btn { background: var(--gold); color: #0a0c10; padding: 12px 24px; border-radius: 10px; font-weight: 600; border: none; cursor: pointer; }

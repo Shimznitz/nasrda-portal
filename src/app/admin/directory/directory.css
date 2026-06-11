@@ -1,0 +1,26 @@
+/*src/app/admin/directory/directory.css*/
+.directory-page { padding: 40px; min-height: 100vh; }
+.triage-table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+.triage-table th { color: #7e8c9a; text-align: left; padding: 12px; border-bottom: 1px solid #2a2f3a; font-size: 0.85rem; }
+.triage-table td { padding: 16px; color: #fff; border-bottom: 1px solid #2a2f3a; }
+.triage-table select { 
+  background: #161a23; border: 1px solid #2a2f3a; color: #fff; 
+  padding: 8px 12px; border-radius: 6px; cursor: pointer; 
+}
+
+.search-input {
+  width: 100%;
+  padding: 12px;
+  background: #161a23;
+  border: 1px solid #2a2f3a;
+  color: white;
+  border-radius: 6px;
+  margin-bottom: 20px;
+}
+.triage-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 15px;
+  border-bottom: 1px solid #2a2f3a;
+  align-items: center;
+}

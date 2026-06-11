@@ -1,0 +1,16 @@
+/*src/app/staff/divisions/[id]/division-detail.css*/
+
+.stats-page { padding: 2rem; max-width: 1000px; margin: 0 auto; color: white; }
+.stats-header { margin-bottom: 2rem; }
+
+.dashboard-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-bottom: 1rem; }
+.stat-card { background: #1f2937; padding: 1.5rem; border-radius: 8px; text-align: center; }
+.stat-card span { display: block; color: #9ca3af; font-size: 0.8rem; text-transform: uppercase; }
+.stat-card strong { font-size: 1.5rem; }
+
+.chart-card { background: #1f2937; padding: 1.5rem; border-radius: 8px; margin-bottom: 1rem; }
+.content-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+.card { background: #1f2937; padding: 1.5rem; border-radius: 8px; }
+
+ul { list-style: none; padding: 0; }
+li { padding: 0.5rem 0; border-bottom: 1px solid #374151; font-size: 0.9rem; }

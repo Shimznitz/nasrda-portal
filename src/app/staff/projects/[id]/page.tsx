@@ -11,129 +11,169 @@ export default function ProjectDetail() {
   const router = useRouter();
 
   const [project, setProject] = useState<any>(null);
-  const [visibleTasks, setVisibleTasks] = useState<any[]>([]);
-  const [userId, setUserId] = useState<string | null>(null);
-
-  const [files, setFiles] = useState<File[]>([]);
-  const [comment, setComment] = useState('');
-  const [activeTask, setActiveTask] = useState<any>(null);
-  const [viewingReview, setViewingReview] = useState<any>(null);
+  const [tasks, setTasks] = useState<any[]>([]);
+  const [isCreator, setIsCreator] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Modal states
+  const [activeTask, setActiveTask] = useState<any>(null);
+  const [comment, setComment] = useState('');
+  const [files, setFiles] = useState<File[]>([]);
+  const [existingFiles, setExistingFiles] = useState<string[]>([]);
+  const [viewingReview, setViewingReview] = useState<any>(null);
+
   useEffect(() => {
-    if (id) loadStaffProjectProfile();
+    if (id) loadProject();
   }, [id]);
 
-  const loadStaffProjectProfile = async () => {
+  const loadProject = async () => {
     setLoading(true);
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
-    setUserId(user.id);
+    setCurrentUserId(user.id);
 
-    const { data: proj } = await supabase.from('projects').select('*').eq('id', id).single();
-    if (!proj) {
-      setLoading(false);
-      return;
+    const { data: proj } = await supabase
+      .from('projects')
+      .select(`
+        *,
+        tasks (
+          *,
+          submissions (*)
+        )
+      `)
+      .eq('id', id)
+      .single();
+
+    if (proj) {
+      setProject(proj);
+      setIsCreator(proj.creator_id === user.id);
+
+      // Filter tasks for current user (unless creator)
+      let visibleTasks = proj.tasks || [];
+      if (!isCreator) {
+        visibleTasks = visibleTasks.filter((t: any) => t.assigned_to === user.id);
+      }
+      setTasks(visibleTasks);
     }
-    setProject(proj);
-
-    const { data: tasks } = await supabase.from('tasks').select('*').eq('project_id', id).eq('assigned_to', user.id);
-    const { data: submissions } = await supabase.from('submissions').select('*').eq('project_id', id).eq('submitted_by', user.id);
-
-    const enriched = (tasks || []).map(t => ({
-      ...t,
-      submission: submissions?.find(s => s.task_id === t.id) || null
-    }));
-
-    setVisibleTasks(enriched);
     setLoading(false);
   };
 
-  const submitTaskExecution = async () => {
+  // Submit / Update submission
+  const saveSubmission = async (isFinalSubmit: boolean) => {
     if (!activeTask) return;
 
-    const uploadedUrls: string[] = [];
-    for (const f of files) {
-      const path = `${id}/${Date.now()}-${f.name}`;
-      const { error: uploadError } = await supabase.storage.from('submissions').upload(path, f);
-      
+    let uploadedUrls: string[] = [...existingFiles];
+
+    for (const file of files) {
+      const path = `${id}/submissions/${Date.now()}-${file.name}`;
+      const { error: uploadError } = await supabase.storage
+        .from('submissions')
+        .upload(path, file);
+
       if (!uploadError) {
-        const { data } = supabase.storage.from('submissions').getPublicUrl(path);
-        uploadedUrls.push(data.publicUrl);
+        const { data: urlData } = supabase.storage
+          .from('submissions')
+          .getPublicUrl(path);
+        uploadedUrls.push(urlData.publicUrl);
       }
     }
 
-    // Upsert mechanism to prevent dual processing row errors
-    if (activeTask.submission) {
-      await supabase.from('submissions').update({
-        description: comment,
-        file_urls: uploadedUrls,
-        status: 'PENDING'
-      }).eq('id', activeTask.submission.id);
+    const payload = {
+      project_id: id,
+      task_id: activeTask.id,
+      submitted_by: currentUserId,
+      description: comment,
+      file_urls: uploadedUrls,
+      status: isFinalSubmit ? 'PENDING' : 'DRAFT'
+    };
+
+    if (activeTask.submissions?.[0]?.id) {
+      await supabase.from('submissions')
+        .update(payload)
+        .eq('id', activeTask.submissions[0].id);
     } else {
-      await supabase.from('submissions').insert({
-        project_id: id,
-        task_id: activeTask.id,
-        submitted_by: userId,
-        description: comment,
-        file_urls: uploadedUrls,
-        status: 'PENDING'
-      });
+      await supabase.from('submissions').insert(payload);
     }
 
-    await supabase.from('tasks').update({ status: 'UNDER_REVIEW' }).eq('id', activeTask.id);
+    if (isFinalSubmit) {
+      await supabase.from('tasks')
+        .update({ status: 'UNDER_REVIEW' })
+        .eq('id', activeTask.id);
+    }
 
     setActiveTask(null);
     setComment('');
     setFiles([]);
-    loadStaffProjectProfile();
+    setExistingFiles([]);
+    loadProject();
   };
 
-  if (loading) return <p className="loading">Parsing context profiles...</p>;
-  if (!project) return <p className="loading">Target module not online.</p>;
+  // Creator: Approve / Reject
+  const handleReview = async (submissionId: string, newStatus: 'COMPLETED' | 'REJECTED', feedback: string) => {
+    await supabase.from('submissions')
+      .update({ admin_feedback: feedback, status: newStatus })
+      .eq('id', submissionId);
+
+    if (newStatus === 'COMPLETED') {
+      await supabase.from('tasks')
+        .update({ status: 'COMPLETED' })
+        .eq('id', viewingReview.id);
+    }
+
+    setViewingReview(null);
+    loadProject();
+  };
+
+  if (loading) return <div className="loading">Loading project...</div>;
+  if (!project) return <div>Project not found</div>;
 
   return (
     <div className="project-detail-page">
-      <button className="back-btn" onClick={() => router.push('/staff/projects')}>← Operations Hub</button>
-      
+      <button className="back-btn" onClick={() => router.push('/staff/projects')}>
+        ← Back to Projects
+      </button>
+
       <div className="detail-header">
         <h1>{project.title}</h1>
         <div className="progress-container">
           <div className="big-progress-text">{project.progress || 0}%</div>
-          <p>Overall Metric Stability</p>
         </div>
       </div>
 
-      <h2>Your Assigned Pipeline Objectives</h2>
+      <p className="project-objectives">{project.objectives}</p>
+
+      <h2>Tasks</h2>
       <div className="tasks-list">
-        {visibleTasks.map(task => (
+        {tasks.map((task: any) => (
           <div key={task.id} className="task-row">
-            <div className={`task-check ${task.status === 'COMPLETED' ? 'checked' : ''}`}>
-              {task.status === 'COMPLETED' ? '✓' : '⎔'}
-            </div>
-
             <div className="task-content">
-              <div className={`task-title ${task.status === 'COMPLETED' ? 'done' : ''}`}>{task.title}</div>
-              <div className="task-meta">Status Condition: <strong>{task.status}</strong></div>
+              <h4>{task.title}</h4>
+              <p className="task-status">Status: <strong>{task.status}</strong></p>
             </div>
 
-            <div className="task-row-actions">
-              {task.submission?.admin_feedback && (
-                <button className="view-feedback-btn" onClick={() => setViewingReview(task)}>
-                  View Feedback Note
+            <div className="task-actions">
+              {(isCreator || task.assigned_to === currentUserId) && (
+                <button 
+                  className="submit-work-btn"
+                  onClick={() => {
+                    setActiveTask(task);
+                    setComment(task.submissions?.[0]?.description || '');
+                    setExistingFiles(task.submissions?.[0]?.file_urls || []);
+                  }}
+                >
+                  {task.status === 'UNDER_REVIEW' ? 'Reviewing' : 'Submit Work'}
                 </button>
               )}
 
-              <button
-                className="submit-work-btn"
-                onClick={() => {
-                  setActiveTask(task);
-                  setComment(task.submission?.description || "");
-                }}
-                disabled={task.status === 'UNDER_REVIEW' || task.status === 'COMPLETED'}
-              >
-                {task.status === 'UNDER_REVIEW' ? 'System Under Review' : task.status === 'COMPLETED' ? 'Completed' : task.submission ? 'Resubmit Revision' : 'Submit Artifacts'}
-              </button>
+              {isCreator && task.submissions?.[0] && (
+                <button 
+                  className="view-feedback-btn"
+                  onClick={() => setViewingReview(task)}
+                >
+                  Review Submission
+                </button>
+              )}
             </div>
           </div>
         ))}
@@ -143,50 +183,58 @@ export default function ProjectDetail() {
       {activeTask && (
         <div className="modal-overlay" onClick={() => setActiveTask(null)}>
           <div className="modal" onClick={e => e.stopPropagation()}>
-            <div className="modal-header">
-              <h2>Upload System Deliverables</h2>
-              <button className="modal-close-btn" onClick={() => setActiveTask(null)}>✕</button>
-            </div>
-            
-            <label className="modal-label">Operational Notes / Commentary</label>
+            <h2>Submit Work - {activeTask.title}</h2>
+
+            <label>Comments / Notes</label>
             <textarea
               className="modal-textarea"
-              placeholder="Detail deployment vectors, configurations, or execution metrics..."
               value={comment}
               onChange={(e) => setComment(e.target.value)}
+              placeholder="Describe what you completed..."
             />
 
-            <label className="modal-label">Attach Verification Payloads</label>
-            <input
-              type="file"
-              className="modal-file-input"
-              multiple
-              onChange={(e) => setFiles(Array.from(e.target.files || []))}
-            />
+            <label>Current Attachments</label>
+            <div className="file-list">
+              {existingFiles.map((url, i) => (
+                <div key={i} className="file-chip">
+                  Attachment {i + 1}
+                  <button onClick={() => setExistingFiles(existingFiles.filter((_, idx) => idx !== i))}>×</button>
+                </div>
+              ))}
+            </div>
 
-            <button className="btn-execute" onClick={submitTaskExecution}>
-              Transmit Payload Package
-            </button>
+            <label>New Attachments</label>
+            <input type="file" multiple onChange={(e) => setFiles(Array.from(e.target.files || []))} />
+
+            <div className="modal-actions">
+              <button onClick={() => setActiveTask(null)}>Cancel</button>
+              <button onClick={() => saveSubmission(false)}>Save Draft</button>
+              <button onClick={() => saveSubmission(true)}>Submit for Review</button>
+            </div>
           </div>
         </div>
       )}
 
-      {/* FEEDBACK VIEWER MODAL */}
-      {viewingReview && (
+      {/* CREATOR REVIEW MODAL */}
+      {viewingReview && viewingReview.submissions?.[0] && (
         <div className="modal-overlay" onClick={() => setViewingReview(null)}>
           <div className="modal" onClick={e => e.stopPropagation()}>
-            <div className="modal-header">
-              <h2>Supervisor Review Assessment</h2>
-              <button className="modal-close-btn" onClick={() => setViewingReview(null)}>✕</button>
+            <h2>Review Submission</h2>
+            <p><strong>Task:</strong> {viewingReview.title}</p>
+
+            <textarea 
+              placeholder="Feedback / Comments for the staff member..."
+              onChange={(e) => setComment(e.target.value)}
+            />
+
+            <div className="modal-actions">
+              <button onClick={() => handleReview(viewingReview.submissions[0].id, 'REJECTED', comment)}>
+                Reject & Request Revision
+              </button>
+              <button onClick={() => handleReview(viewingReview.submissions[0].id, 'COMPLETED', comment)}>
+                Approve Task
+              </button>
             </div>
-            <p className="task-context-heading">Target Task: <strong>{viewingReview.title}</strong></p>
-            
-            <div className="feedback-statement-box">
-              <h4>Administrative Statement:</h4>
-              <p>{viewingReview.submission?.admin_feedback}</p>
-            </div>
-            
-            <button className="btn-execute secondary" onClick={() => setViewingReview(null)}>Dismiss Panel</button>
           </div>
         </div>
       )}

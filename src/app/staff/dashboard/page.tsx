@@ -2,209 +2,212 @@
 'use client';
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from "recharts";
 import "./dashboard.css";
 
-const COLORS = ['#c9a84c', '#64dcb4', '#64a0ff', '#e05c5c'];
-
-export default function Dashboard() {
-  const [profile, setProfile] = useState<any>(null);
-  const [centre, setCentre] = useState<any>(null);
-  const [stats, setStats] = useState<any>({});
-  const [chartData, setChartData] = useState<any[]>([]);
-  const [statusData, setStatusData] = useState<any[]>([]);
-  const [recentTasks, setRecentTasks] = useState<any[]>([]);
-  const [myProjects, setMyProjects] = useState<any[]>([]);
+export default function StaffDashboard() {
+  const router = useRouter();
+  const [userProfile, setUserProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
+  // Global Search
+  const [searchTerm, setSearchTerm] = useState('');
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [searching, setSearching] = useState(false);
+
+  // DG Global Overview Stats
+  const [globalStats, setGlobalStats] = useState({
+    totalStaff: 0,
+    totalProjects: 0,
+    activeProjects: 0,
+    pendingTasks: 0,
+  });
+
+  const [recentProjects, setRecentProjects] = useState<any[]>([]);
+  const [unassignedStaff, setUnassignedStaff] = useState<any[]>([]);
+
   useEffect(() => {
-    loadDashboard();
+    loadDGDashboard();
   }, []);
 
-  const loadDashboard = async () => {
+  const loadDGDashboard = async () => {
     setLoading(true);
-
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
-    const { data: prof } = await supabase
-      .from('profiles').select('*').eq('id', user.id).single();
-    setProfile(prof);
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', user.id)
+      .single();
 
-    if (prof?.centre_id) {
-      const { data: c } = await supabase
-        .from('centres').select('name, location').eq('id', prof.centre_id).single();
-      setCentre(c);
-    }
+    setUserProfile(profile);
 
-    if (['SUPER_ADMIN', 'CENTRE_ADMIN'].includes(prof?.role)) {
-      // Admin Dashboard
-      const adminStats = await Promise.all([
-        supabase.from('centres').select('*', { count: 'exact', head: true }),
-        supabase.from('projects').select('*', { count: 'exact', head: true }),
-        supabase.from('profiles').select('*', { count: 'exact', head: true }),
-        supabase.from('projects').select('title, status, progress').limit(6),
-      ]);
-
-      setStats({
-        totalCentres: adminStats[0].count || 0,
-        totalProjects: adminStats[1].count || 0,
-        totalStaff: adminStats[2].count || 0,
+    if (profile?.role === 'DG' || profile?.role === 'SUPER_ADMIN') {
+      // Global Stats
+      const { count: totalStaff } = await supabase.from('profiles').select('*', { count: 'exact', head: true });
+      const { count: totalProjects } = await supabase.from('projects').select('*', { count: 'exact', head: true });
+      const { count: activeProjects } = await supabase.from('projects').select('*', { count: 'exact', head: true }).eq('status', 'ACTIVE');
+      
+      setGlobalStats({
+        totalStaff: totalStaff || 0,
+        totalProjects: totalProjects || 0,
+        activeProjects: activeProjects || 0,
+        pendingTasks: 0, // You can expand this later
       });
 
-      setChartData(adminStats[3].data?.map((p: any) => ({
-        name: p.title?.slice(0, 14) + '...',
-        progress: p.progress || 0,
-      })) || []);
-
-      // Status pie
-      const statusCounts: any = {};
-      adminStats[3].data?.forEach((p: any) => {
-        statusCounts[p.status] = (statusCounts[p.status] || 0) + 1;
-      });
-      setStatusData(Object.entries(statusCounts).map(([name, value]) => ({ name, value })));
-
-    } else {
-      // Staff / Mid-level Dashboard
-      const { data: tasks } = await supabase
-        .from('tasks')
-        .select('*, projects(title)')
-        .eq('assigned_to', user.id)
-        .neq('status', 'COMPLETED')
-        .order('due_date', { ascending: true })
-        .limit(5);
-
+      // Recent Projects
       const { data: projects } = await supabase
-        .from('project_members')
-        .select('projects(*)')
-        .eq('profile_id', user.id);
+        .from('projects')
+        .select('id, title, status, created_at, creator:profiles!created_by(name)')
+        .order('created_at', { ascending: false })
+        .limit(8);
 
-      setRecentTasks(tasks || []);
-      setMyProjects(projects?.map(p => p.projects) || []);
-      setStats({
-        myProjects: projects?.length || 0,
-        myPendingTasks: tasks?.length || 0,
-      });
+      setRecentProjects(projects || []);
+
+      // Unassigned Staff for Triage
+      const { data: unassigned } = await supabase
+        .from('profiles')
+        .select('id, name, designation, email')
+        .is('department_id', null)
+        .limit(10);
+
+      setUnassignedStaff(unassigned || []);
     }
 
     setLoading(false);
   };
 
-  const toggleTask = async (taskId: string) => {
-    await supabase.from('tasks').update({ status: 'COMPLETED' }).eq('id', taskId);
-    setRecentTasks(prev => prev.filter(t => t.id !== taskId));
+  // Global Search (Staff + Projects)
+  const performGlobalSearch = async () => {
+    if (searchTerm.length < 2) {
+      setSearchResults([]);
+      return;
+    }
+
+    setSearching(true);
+
+    const { data: staffResults } = await supabase
+      .from('profiles')
+      .select('id, name, designation, role, department_id')
+      .ilike('name', `%${searchTerm}%`)
+      .limit(10);
+
+    const { data: projectResults } = await supabase
+      .from('projects')
+      .select('id, title, objectives, status')
+      .ilike('title', `%${searchTerm}%`)
+      .limit(10);
+
+    setSearchResults([
+      ...(staffResults?.map(s => ({ ...s, type: 'staff' })) || []),
+      ...(projectResults?.map(p => ({ ...p, type: 'project' })) || [])
+    ]);
+
+    setSearching(false);
   };
 
-  if (loading) return <div className="loading">Loading dashboard...</div>;
+  if (loading) return <div className="loading">Loading Executive Command Center...</div>;
 
-  const isAdmin = ['SUPER_ADMIN', 'CENTRE_ADMIN'].includes(profile?.role);
-  const isStaff = profile?.role === 'STAFF';
+  // DG / SUPER_ADMIN VIEW
+  if (userProfile?.role === 'DG' || userProfile?.role === 'SUPER_ADMIN') {
+    return (
+      <div className="dashboard-page dg-dashboard">
+        <div className="greeting">
+          <h1>Welcome back, Director General.</h1>
+          <p>National Space Research and Development Agency — Executive Overview</p>
+        </div>
 
+        {/* FIXED GLOBAL SEARCH BAR */}
+        <div className="global-search-bar">
+          <input
+            type="text"
+            className="global-search-input"
+            placeholder="Search staff, projects, divisions, or anything..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            onKeyUp={performGlobalSearch}
+          />
+          {searching && <span className="searching">Searching...</span>}
+        </div>
+
+        {searchResults.length > 0 && (
+          <div className="search-results-container">
+            {searchResults.map((item: any) => (
+              <div key={item.id} className="search-result-item">
+                {item.type === 'staff' ? (
+                  <div>👤 {item.name} — {item.designation || item.role}</div>
+                ) : (
+                  <div>📋 {item.title}</div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Global Stats */}
+        <div className="stats-grid">
+          <div className="stat-card">
+            <div className="stat-value">{globalStats.totalStaff}</div>
+            <div className="stat-label">Total Personnel</div>
+          </div>
+          <div className="stat-card">
+            <div className="stat-value">{globalStats.totalProjects}</div>
+            <div className="stat-label">Total Projects</div>
+          </div>
+          <div className="stat-card highlight">
+            <div className="stat-value">{globalStats.activeProjects}</div>
+            <div className="stat-label">Active Projects</div>
+          </div>
+        </div>
+
+        {/* Recent Projects */}
+        <div className="chart-card">
+          <div className="chart-title">Recent Projects Across Agency</div>
+          <div className="mini-project-list">
+            {recentProjects.map(p => (
+              <div key={p.id} className="mini-project-card" onClick={() => router.push(`/staff/projects/${p.id}`)}>
+                <div className="mini-project-title">{p.title}</div>
+                <div className="mini-project-meta">By {p.creator?.name || 'Unknown'}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Triage Queue */}
+        <div className="chart-card">
+          <div className="chart-title">Unassigned Staff Triage</div>
+          {unassignedStaff.length === 0 ? (
+            <p>All personnel are assigned.</p>
+          ) : (
+            <table className="triage-table">
+              <tbody>
+                {unassignedStaff.map(staff => (
+                  <tr key={staff.id}>
+                    <td>{staff.name}</td>
+                    <td>{staff.designation}</td>
+                    <td>
+                      <button onClick={() => alert(`Assign ${staff.name} to department`)}>
+                        Assign
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // Fallback for other roles
   return (
     <div className="dashboard-page">
       <div className="greeting">
-        <h1>Good {new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 17 ? 'afternoon' : 'evening'}, {profile?.name?.split(' ')[0]}.</h1>
-        <p>{isAdmin ? 'Agency / Centre Overview' : 'Your personal workspace'}</p>
+        <h1>Good evening, {userProfile?.name}.</h1>
       </div>
-
-      {isAdmin && (
-        <>
-          <div className="stats-grid">
-            {/* Admin Stats Cards */}
-            <div className="stat-card">
-              <div className="stat-value">{stats.totalProjects}</div>
-              <div className="stat-label">Total Projects</div>
-            </div>
-            <div className="stat-card">
-              <div className="stat-value">{stats.totalCentres}</div>
-              <div className="stat-label">Centres & Labs</div>
-            </div>
-            <div className="stat-card">
-              <div className="stat-value">{stats.totalStaff}</div>
-              <div className="stat-label">Total Staff</div>
-            </div>
-          </div>
-
-          {/* Charts for Admins */}
-          {chartData.length > 0 && (
-            <div className="charts-grid">
-              {/* Bar Chart */}
-              <div className="chart-card">
-                <h3>Project Progress</h3>
-                <ResponsiveContainer width="100%" height={240}>
-                  <BarChart data={chartData}>
-                    <XAxis dataKey="name" tick={{ fill: '#7a8699', fontSize: 11 }} />
-                    <YAxis domain={[0, 100]} />
-                    <Tooltip />
-                    <Bar dataKey="progress" fill="#c9a84c" radius={4} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-
-              {/* Pie Chart */}
-              {statusData.length > 0 && (
-                <div className="chart-card">
-                  <h3>Projects by Status</h3>
-                  <ResponsiveContainer width="100%" height={240}>
-                    <PieChart>
-                      <Pie data={statusData} cx="50%" cy="45%" outerRadius={90} dataKey="value">
-                        {statusData.map((_, index) => (
-                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                        ))}
-                      </Pie>
-                      <Tooltip />
-                      <Legend />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </div>
-              )}
-            </div>
-          )}
-        </>
-      )}
-
-      {/* Staff & Mid-level View */}
-      {!isAdmin && (
-        <>
-          <div className="stats-grid">
-            <div className="stat-card">
-              <div className="stat-value">{stats.myProjects}</div>
-              <div className="stat-label">My Projects</div>
-            </div>
-            <div className="stat-card highlight">
-              <div className="stat-value">{stats.myPendingTasks}</div>
-              <div className="stat-label">Pending Tasks</div>
-            </div>
-          </div>
-
-          {/* Recent Tasks */}
-          {recentTasks.length > 0 && (
-            <div className="section-block">
-              <h2 className="section-title-sm">Recent Tasks</h2>
-              <div className="tasks-list-dash">
-                {recentTasks.map((task: any) => (
-                  <div key={task.id} className="task-row-dash" onClick={() => toggleTask(task.id)}>
-                    <div className={`task-check ${task.status === 'COMPLETED' ? 'checked' : ''}`}>
-                      {task.status === 'COMPLETED' ? '✓' : ''}
-                    </div>
-                    <div className="task-info-dash">
-                      <div className="task-title-dash">{task.title}</div>
-                      <div className="task-project">{task.projects?.title}</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {recentTasks.length === 0 && (
-            <div className="empty-state">
-              <p>You have no pending tasks at the moment.</p>
-            </div>
-          )}
-        </>
-      )}
     </div>
   );
 }

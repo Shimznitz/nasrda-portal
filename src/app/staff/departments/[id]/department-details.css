@@ -1,0 +1,292 @@
+/* src/app/staff/departments/[id]/department-details.css */
+
+.dept-details-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.insight-header-banner {
+  background: linear-gradient(135deg, var(--bg2) 0%, rgba(10, 12, 16, 0.6) 100%);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 40px;
+  margin-bottom: 32px;
+}
+
+.accent-pill {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.75rem;
+  color: var(--gold);
+  background: var(--gold-dim);
+  border: 1px solid rgba(212, 175, 55, 0.2);
+  padding: 6px 12px;
+  border-radius: 100px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  display: inline-block;
+  margin-bottom: 16px;
+}
+
+.insight-header-banner h1 {
+  font-size: 2.5rem;
+  font-weight: 600;
+  color: var(--text);
+  margin: 0 0 12px 0;
+  letter-spacing: -0.02em;
+}
+
+.location-tag {
+  color: var(--text3);
+  font-size: 1rem;
+  margin: 0;
+}
+
+/* Analytics Dashboard Grid Framework */
+.analytics-dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 20px;
+  margin-bottom: 32px;
+}
+
+.metric-box {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+}
+
+.metric-label {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.8rem;
+  color: var(--text3);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 12px;
+}
+
+.metric-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.metric-num {
+  font-size: 2.5rem;
+  font-weight: 600;
+  color: var(--text);
+  line-height: 1;
+}
+
+.trend-indicator {
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+.trend-indicator.upward {
+  color: #4ade80;
+}
+
+.trend-indicator.textual {
+  color: var(--text3);
+}
+
+.mini-progress-track {
+  width: 100%;
+  height: 4px;
+  background: var(--bg3);
+  border-radius: 10px;
+  overflow: hidden;
+  margin-top: auto;
+}
+
+.fill-bar {
+  height: 100%;
+  background: linear-gradient(90deg, #4f46e5, var(--gold));
+  border-radius: 10px;
+  transition: width 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.fill-bar.gold-fill {
+  background: var(--gold);
+}
+
+.fill-bar.success-fill {
+  background: #22c55e;
+}
+
+/* Operational Breakdowns Area Layout */
+.insight-sections-split {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 24px;
+}
+
+@media (max-width: 968px) {
+  .insight-sections-split {
+    grid-template-columns: 1fr;
+  }
+}
+
+.section-main-card, .section-side-card {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 32px;
+}
+
+.section-main-card h3, .section-side-card h3 {
+  font-size: 1.2rem;
+  font-weight: 500;
+  color: var(--text);
+  margin: 0 0 24px 0;
+}
+
+/* Seamless Semantic-safe Custom Grid Table */
+.telemetry-table {
+  display: flex;
+  flex-direction: column;
+}
+
+.table-row {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr;
+  align-items: center;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text2);
+  font-size: 0.95rem;
+}
+
+.table-row.table-header {
+  border-bottom: 2px solid var(--border);
+  color: var(--text3);
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding-bottom: 12px;
+}
+
+.table-row:last-child {
+  border-bottom: none;
+}
+
+.proj-title-cell {
+  font-weight: 500;
+  color: var(--text);
+}
+
+/* Status Flags Badge Design System */
+.status-pill {
+  display: inline-block;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.status-pill.active, .status-pill.completed {
+  background: rgba(34, 197, 94, 0.1);
+  color: #22c55e;
+  border: 1px solid rgba(34, 197, 94, 0.2);
+}
+
+.status-pill.progress {
+  background: rgba(234, 179, 8, 0.1);
+  color: var(--gold);
+  border: 1px solid rgba(234, 179, 8, 0.2);
+}
+
+.status-pill.idle {
+  background: var(--bg3);
+  color: var(--text3);
+  border: 1px solid var(--border);
+}
+
+/* Internal Health Pipeline Meters */
+.health-bar-container {
+  width: 100%;
+  height: 6px;
+  background: var(--bg3);
+  border-radius: 100px;
+  overflow: hidden;
+}
+
+.health-fill {
+  height: 100%;
+  border-radius: 100px;
+}
+
+.health-fill.green { background: #22c55e; }
+.health-fill.yellow { background: var(--gold); }
+
+/* Leadership Side Block Panel Components */
+.meta-profile-capsule {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  padding: 20px;
+  border-radius: 12px;
+  margin-bottom: 20px;
+}
+
+.meta-avatar {
+  width: 44px;
+  height: 44px;
+  background: var(--gold-dim);
+  border: 1px solid var(--gold);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'IBM Plex Mono', monospace;
+  font-weight: 600;
+  color: var(--gold);
+}
+
+.meta-name {
+  font-size: 1rem;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.meta-title {
+  font-size: 0.8rem;
+  color: var(--text3);
+  margin-top: 2px;
+}
+
+.structural-narrative {
+  font-size: 0.95rem;
+  color: var(--text2);
+  line-height: 1.6;
+  margin: 0;
+}
+
+.empty-table-state {
+  padding: 40px 20px;
+  text-align: center;
+  color: var(--text3);
+  font-size: 0.95rem;
+}
+
+.telemetry-loading, .telemetry-error {
+  text-align: center;
+  padding: 120px 20px;
+  color: var(--text3);
+  font-size: 1.1rem;
+}

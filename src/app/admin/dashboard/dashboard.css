@@ -1,0 +1,162 @@
+/*src/app/admin/dashboard/dashboard.css*/
+:root {
+  --bg-deep: #070a12;
+  --bg-surface: #111827;
+  --border-glow: #1f293d;
+  --gold-metallic: #c9a84c;
+  --text-primary: #f3f4f6;
+  --text-secondary: #9ca3af;
+}
+
+.unified-dashboard {
+  max-width: 1300px;
+  margin: 0 auto;
+  padding: 40px 24px;
+  background-color: var(--bg-deep);
+  color: var(--text-primary);
+  font-family: system-ui, sans-serif;
+}
+
+.dashboard-banner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: linear-gradient(135deg, #111827 0%, #1e293b 100%);
+  border: 1px solid var(--border-glow);
+  padding: 32px;
+  border-radius: 16px;
+  margin-bottom: 32px;
+}
+
+.clearance-pill {
+  display: inline-block;
+  margin-top: 8px;
+  background: rgba(201, 168, 76, 0.15);
+  color: var(--gold-metallic);
+  padding: 6px 14px;
+  border-radius: 99px;
+  font-weight: 600;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+}
+
+.metrics-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 24px;
+  margin-bottom: 40px;
+}
+
+.metric-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-glow);
+  padding: 24px;
+  border-radius: 12px;
+}
+
+.metric-card h4 {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+
+.metric-num {
+  font-size: 2.5rem;
+  font-weight: 800;
+  color: var(--text-primary);
+}
+
+.organogram-management-block {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-glow);
+  padding: 32px;
+  border-radius: 16px;
+  margin-bottom: 40px;
+}
+
+.inline-generation-form {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  margin-top: 20px;
+  flex-wrap: wrap;
+}
+
+.inline-generation-form input[type="text"] {
+  background: var(--bg-deep);
+  border: 1px solid var(--border-glow);
+  padding: 12px;
+  border-radius: 8px;
+  color: white;
+  flex: 1;
+  min-width: 250px;
+}
+
+.action-commit-btn {
+  background: var(--gold-metallic);
+  color: black;
+  font-weight: 700;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.entity-table-wrapper { margin-top: 32px; }
+
+.organogram-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 16px;
+}
+
+.organogram-table th, .organogram-table td {
+  padding: 14px;
+  text-align: left;
+  border-bottom: 1px solid var(--border-glow);
+}
+
+.organogram-table th { color: var(--text-secondary); font-size: 0.9rem; }
+
+.ess-tag {
+  background: #3b82f6;
+  color: white;
+  font-size: 0.7rem;
+  padding: 2px 8px;
+  border-radius: 4px;
+  margin-left: 8px;
+  font-weight: bold;
+}
+
+.vacant { color: #ef4444; font-style: italic; }
+
+.table-selector {
+  background: var(--bg-deep);
+  color: white;
+  border: 1px solid var(--border-glow);
+  padding: 8px;
+  border-radius: 6px;
+}
+
+.routing-shortcuts-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(450px, 1fr));
+  gap: 24px;
+}
+
+.shortcut-card {
+  background: linear-gradient(to right, #111827, #151f32);
+  border: 1px solid var(--border-glow);
+  padding: 28px;
+  border-radius: 12px;
+}
+
+.shortcut-card p { color: var(--text-secondary); margin: 12px 0 20px 0; font-size: 0.95rem; }
+
+.shortcut-link {
+  color: var(--gold-metallic);
+  text-decoration: none;
+  font-weight: 600;
+}
+.shortcut-link:hover { text-decoration: underline; }

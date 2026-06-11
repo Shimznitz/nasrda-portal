@@ -1,156 +1,272 @@
 /* src/app/staff/projects/[id]/[id].css */
+
 .project-detail-page {
   max-width: 1100px;
   margin: 0 auto;
   padding: 40px 24px;
-  color: var(--text, #ffffff);
+  color: var(--text);
 }
 
 .back-btn {
-  background: #1e293b;
-  border: 1px solid var(--border, #26324d);
-  color: #ccd6e0;
-  padding: 8px 16px;
-  border-radius: 8px;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  color: var(--text2);
+  padding: 10px 18px;
+  border-radius: 10px;
   cursor: pointer;
-  margin-bottom: 24px;
+  margin-bottom: 28px;
+  font-size: 0.95rem;
+}
+
+.back-btn:hover {
+  background: var(--bg4);
+  color: var(--text);
 }
 
 .detail-header {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 32px;
+  margin-bottom: 40px;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 40px;
-  background: var(--bg2, #151c2c);
-  padding: 32px;
-  border-radius: 16px;
-  border: 1px solid var(--border, #26324d);
+  flex-wrap: wrap;
+  gap: 20px;
+}
+
+.detail-header h1 {
+  font-size: 2.1rem;
+  font-weight: 600;
+  color: var(--text);
+  margin: 0;
 }
 
 .big-progress-text {
-  font-size: 3rem;
+  font-size: 3.2rem;
   font-weight: 800;
-  color: var(--gold, #c9a84c);
-  font-family: monospace;
+  color: var(--gold);
+  font-family: 'IBM Plex Mono', monospace;
+  line-height: 1;
 }
 
+.project-objectives {
+  color: var(--text2);
+  line-height: 1.6;
+  margin-bottom: 40px;
+  font-size: 1.02rem;
+}
+
+/* Tasks List */
 .tasks-list {
   display: flex;
   flex-direction: column;
-  gap: 14px;
-  margin-top: 20px;
+  gap: 16px;
 }
 
 .task-row {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 24px;
   display: flex;
   align-items: center;
   gap: 20px;
-  background: var(--bg2, #151c2c);
-  padding: 20px 24px;
-  border-radius: 12px;
-  border: 1px solid var(--border, #26324d);
+  transition: all 0.2s;
 }
 
-.task-check {
-  font-size: 1.4rem;
-  color: var(--gold, #c9a84c);
+.task-row:hover {
+  border-color: var(--gold);
+  transform: translateY(-2px);
 }
 
 .task-content {
   flex: 1;
 }
 
-.task-title {
+.task-content h4 {
+  margin: 0 0 8px 0;
   font-size: 1.1rem;
-  font-weight: 500;
-}
-.task-title.done {
-  text-decoration: line-through;
-  color: #64748b;
+  color: var(--text);
 }
 
-.task-meta {
-  font-size: 0.85rem;
-  color: #8a99ad;
-  margin-top: 4px;
+.task-status {
+  font-size: 0.9rem;
+  color: var(--text3);
 }
 
-.task-row-actions {
+.task-actions {
   display: flex;
   gap: 12px;
+  flex-shrink: 0;
+}
+
+.submit-work-btn,
+.view-feedback-btn {
+  padding: 10px 20px;
+  border-radius: 10px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+  font-size: 0.95rem;
 }
 
 .submit-work-btn {
-  background: var(--gold, #c9a84c);
-  color: #000;
+  background: var(--gold);
+  color: #0a0c10;
   border: none;
-  padding: 10px 18px;
-  border-radius: 8px;
-  font-weight: 600;
-  cursor: pointer;
 }
-.submit-work-btn:disabled {
-  background: #334155;
-  color: #64748b;
-  cursor: not-allowed;
+
+.submit-work-btn:hover {
+  background: var(--gold2);
 }
 
 .view-feedback-btn {
-  background: rgba(239, 68, 68, 0.15);
-  color: #ef4444;
-  border: 1px solid rgba(239, 68, 68, 0.3);
-  padding: 10px 18px;
-  border-radius: 8px;
-  cursor: pointer;
-  font-weight: 600;
+  background: transparent;
+  border: 1px solid var(--gold);
+  color: var(--gold);
 }
 
-/* Modal Internal Adaptations */
+.view-feedback-btn:hover {
+  background: var(--gold-dim);
+}
+
+/* Modals */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  padding: 20px;
+}
+
+.modal {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  width: 100%;
+  max-width: 620px;
+  max-height: 90vh;
+  overflow-y: auto;
+  padding: 32px;
+}
+
+.modal h2 {
+  margin-top: 0;
+  color: var(--text);
+  font-size: 1.5rem;
+}
+
 .modal-label {
   display: block;
   font-size: 0.85rem;
-  color: #8a99ad;
-  margin: 14px 0 6px 0;
+  color: var(--text3);
+  margin: 20px 0 8px 0;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-family: 'IBM Plex Mono', monospace;
 }
 
 .modal-textarea {
   width: 100%;
-  min-height: 120px;
-  background: #0b0f19;
-  border: 1px solid #26324d;
-  border-radius: 8px;
-  color: white;
-  padding: 12px;
-  box-sizing: border-box;
+  min-height: 140px;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--text);
+  padding: 14px;
+  resize: vertical;
 }
 
 .modal-file-input {
-  background: #0b0f19;
-  border: 1px dashed #26324d;
-  padding: 16px;
   width: 100%;
-  border-radius: 8px;
-  color: white;
-  box-sizing: border-box;
+  padding: 12px;
+  background: var(--bg3);
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+  color: var(--text);
 }
 
-.btn-execute {
-  width: 100%;
-  background: var(--gold, #c9a84c);
-  color: black;
+/* File Chips */
+.file-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 12px 0;
+}
+
+.file-chip {
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  padding: 8px 14px;
+  border-radius: 9999px;
+  font-size: 0.9rem;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--text2);
+}
+
+.remove-file-btn {
+  background: none;
   border: none;
-  padding: 12px;
-  border-radius: 8px;
-  font-weight: 700;
-  margin-top: 20px;
+  color: #e05c5c;
+  font-size: 1.1rem;
+  cursor: pointer;
+  padding: 0 4px;
+}
+
+.remove-file-btn:hover {
+  color: #ff7777;
+}
+
+/* Modal Actions */
+.modal-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  margin-top: 32px;
+}
+
+.modal-actions button {
+  padding: 12px 24px;
+  border-radius: 10px;
+  font-weight: 600;
   cursor: pointer;
 }
-.btn-execute.secondary { background: #334155; color: white; }
 
-.feedback-statement-box {
-  background: #0b0f19;
-  border-left: 4px solid #ef4444;
-  padding: 16px;
-  border-radius: 0 8px 8px 0;
-  margin: 16px 0;
+.modal-actions button:first-child {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text2);
+}
+
+.modal-actions button:last-child {
+  background: var(--gold);
+  color: #0a0c10;
+  border: none;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .detail-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .task-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+  }
+  
+  .modal {
+    padding: 24px;
+    margin: 10px;
+  }
 }

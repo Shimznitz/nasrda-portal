@@ -1,467 +1,556 @@
-// src/app/staff/divisions/page.tsx
+/* src/app/staff/divisions/page.tsx */
 'use client';
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { useRouter } from "next/navigation";
+import { useParams } from 'next/navigation';
 import "./divisions.css";
 
 export default function ManageDivisions() {
-  const [profile, setProfile] = useState<any>(null);
-  const [divisions, setDivisions] = useState<any[]>([]);
-  const [departments, setDepartments] = useState<any[]>([]);
-  const [units, setUnits] = useState<any[]>([]);
-  const [divisionStaff, setDivisionStaff] = useState<any[]>([]);
+  const router = useRouter();
   const [loading, setLoading] = useState(true);
-  const [showForm, setShowForm] = useState(false);
-  const [formType, setFormType] = useState<'division' | 'department' | 'unit'>('division');
-  const [form, setForm] = useState({ name: '', parent_id: '' });
+  const [myDept, setMyDept] = useState<any>(null);
+  const [divisions, setDivisions] = useState<any[]>([]);
+
+  // Modals Visibility States
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showManageModal, setShowManageModal] = useState(false);
+  const [selectedDivision, setSelectedDivision] = useState<any>(null);
+
+  // Form Field States
+  const [newName, setNewName] = useState("");
+  const [newCode, setNewCode] = useState("");
+
+  // Staff Search States
   const [headSearch, setHeadSearch] = useState('');
-  const [headResults, setHeadResults] = useState<any[]>([]);
+  const [searchResults, setSearchResults] = useState<any[]>([]);
   const [selectedHead, setSelectedHead] = useState<any>(null);
+  const [searching, setSearching] = useState(false);
+  const [conflictMsg, setConflictMsg] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
-  const [selected, setSelected] = useState<any>(null);
-  const [selectedType, setSelectedType] = useState('');
-  const [activeTab, setActiveTab] = useState<'structure' | 'staff'>('structure');
+
+  // state for editing fields
+const [editName, setEditName] = useState("");
+const [editDescription, setEditDescription] = useState("");
+
+  // Replace your existing loadDivisionsScreen with this:
+const loadDivisionsScreen = async () => {
+  setLoading(true);
+  const { data: { user }, error: userErr } = await supabase.auth.getUser();
+  if (userErr || !user) { setLoading(false); return; }
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('department_id')
+    .eq('id', user.id)
+    .single();
+
+  if (!profile?.department_id) { setLoading(false); return; }
+
+  const { data: dept } = await supabase
+    .from('departments')
+    .select('*')
+    .eq('id', profile?.department_id)
+    .single();
+  
+
+  if (dept) setMyDept(dept);
+
+  if (!dept) { setLoading(false); return; }
+  setMyDept(dept);
+
+  // Fetch divisions AND count using a lateral join or simple join
+  // Note: Ensure your 'divisions' table has a 'description' column
+  const { data: divs, error: divErr } = await supabase
+    .from('divisions')
+    .select(`
+      *, 
+      division_head:profiles!divisions_head_id_fkey(
+        id,
+      name,
+      designation,
+      role,
+      division_id,
+      department_id
+      ),
+      member_count:profiles!profiles_division_id_fkey(count)
+    `)
+    .eq('department_id', dept.id)
+    .order('name', { ascending: true });
+
+    console.log("Found divisions:", divs);
+
+  if (divErr) {
+    // This forces the hidden details into view
+    console.error("Divisions fetch error:", divErr);
+    console.error("DEBUGGING SUPABASE ERROR:", JSON.stringify(divErr, null, 2));
+    console.dir(divErr); 
+  }
+
+  if (!divErr) {
+    const formatted = (divs || []).map(d => ({
+      ...d,
+      staffCount: d.staff_count?.[0]?.count || 0
+    }));
+    setDivisions(formatted);
+  }
+  setLoading(false);
+};
 
   useEffect(() => {
-    const load = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-      const { data: prof } = await supabase
-        .from('profiles').select('*').eq('id', user.id).single();
-      setProfile(prof);
-      await fetchAll(prof);
-    };
-    load();
+    loadDivisionsScreen();
   }, []);
 
-  const fetchAll = async (prof: any) => {
-    if (prof?.role === 'SUPER_ADMIN') {
-      // Super admin sees all HQ divisions and departments
-      const { data: divs } = await supabase.from('divisions').select('*').eq('is_hq', true);
-      const { data: depts } = await supabase.from('departments').select('*').eq('is_hq', true);
-      await fetchHeadsAndUnits(divs || [], depts || []);
-
-    } else if (prof?.role === 'CENTRE_ADMIN') {
-      // Centre admin sees their centre's divisions and departments
-      const { data: divs } = await supabase.from('divisions').select('*').eq('centre_id', prof.centre_id);
-      const { data: depts } = await supabase.from('departments').select('*').eq('centre_id', prof.centre_id);
-      await fetchHeadsAndUnits(divs || [], depts || []);
-
-    } else if (prof?.role === 'DIVISION_HEAD' || prof?.role === 'DEPT_HEAD') {
-      // Division/Dept head sees only their own units and staff
-      const { data: myDiv } = await supabase
-        .from('divisions').select('*').eq('head_id', prof.id).single();
-      const { data: myDept } = await supabase
-        .from('departments').select('*').eq('head_id', prof.id).single();
-
-      const parentId = myDiv?.id || myDept?.id;
-      const parentType = myDiv ? 'division' : 'department';
-
-      if (parentId) {
-        const { data: myUnits } = await supabase
-          .from('units')
-          .select('*')
-          [parentType === 'division' ? 'eq' : 'eq']
-          (parentType === 'division' ? 'division_id' : 'department_id', parentId);
-
-        // Get unit heads
-        const unitHeadIds = (myUnits || []).map((u: any) => u.head_id).filter(Boolean);
-        let unitHeadsMap: any = {};
-        if (unitHeadIds.length > 0) {
-          const { data: heads } = await supabase
-            .from('profiles').select('id, name, designation').in('id', unitHeadIds);
-          (heads || []).forEach((h: any) => { unitHeadsMap[h.id] = h; });
-        }
-
-        const unitsWithHeads = (myUnits || []).map((u: any) => ({
-          ...u,
-          profiles: u.head_id ? unitHeadsMap[u.head_id] : null,
-          divisions: myDiv ? { name: myDiv.name } : null,
-          departments: myDept ? { name: myDept.name } : null,
-        }));
-
-        setUnits(unitsWithHeads);
-
-        // Get staff in this division
-        const unitIds = (myUnits || []).map((u: any) => u.id);
-        const { data: staff } = await supabase
-          .from('profiles')
-          .select('id, name, designation, role, unit_id')
-          .or(
-            parentType === 'division'
-              ? `division_id.eq.${parentId}`
-              : `department_id.eq.${parentId}`
-          );
-        setDivisionStaff(staff || []);
-      }
-
-      setDivisions([]);
-      setDepartments([]);
-      setLoading(false);
-      return;
-    }
-    setLoading(false);
-  };
-
-  const fetchHeadsAndUnits = async (divs: any[], depts: any[]) => {
-    const headIds = [...divs, ...depts].map((d: any) => d.head_id).filter(Boolean);
-    let headsMap: any = {};
-    if (headIds.length > 0) {
-      const { data: heads } = await supabase
-        .from('profiles').select('id, name, designation').in('id', headIds);
-      (heads || []).forEach((h: any) => { headsMap[h.id] = h; });
-    }
-
-    const divsWithHeads = divs.map((d: any) => ({ ...d, profiles: d.head_id ? headsMap[d.head_id] : null }));
-    const deptsWithHeads = depts.map((d: any) => ({ ...d, profiles: d.head_id ? headsMap[d.head_id] : null }));
-
-    const divIds = divs.map((d: any) => d.id);
-    const deptIds = depts.map((d: any) => d.id);
-    let unitsData: any[] = [];
-
-    if (divIds.length > 0) {
-      const { data: u1 } = await supabase.from('units').select('*').in('division_id', divIds);
-      unitsData = [...unitsData, ...(u1 || [])];
-    }
-    if (deptIds.length > 0) {
-      const { data: u2 } = await supabase.from('units').select('*').in('department_id', deptIds);
-      unitsData = [...unitsData, ...(u2 || [])];
-    }
-
-    const unitHeadIds = unitsData.map((u: any) => u.head_id).filter(Boolean);
-    let unitHeadsMap: any = {};
-    if (unitHeadIds.length > 0) {
-      const { data: uHeads } = await supabase
-        .from('profiles').select('id, name, designation').in('id', unitHeadIds);
-      (uHeads || []).forEach((h: any) => { unitHeadsMap[h.id] = h; });
-    }
-
-    const unitsWithHeads = unitsData.map((u: any) => ({
-      ...u,
-      profiles: u.head_id ? unitHeadsMap[u.head_id] : null,
-      divisions: divs.find((d: any) => d.id === u.division_id) || null,
-      departments: depts.find((d: any) => d.id === u.department_id) || null,
-    }));
-
-    setDivisions(divsWithHeads);
-    setDepartments(deptsWithHeads);
-    setUnits(unitsWithHeads);
-    setLoading(false);
-  };
-
+  // Single, Unified Search Engine Logic
   useEffect(() => {
     const search = async () => {
-      if (headSearch.length < 2) { setHeadResults([]); return; }
-      const { data } = await supabase
-        .from('profiles').select('id, name, designation, role')
-        .ilike('name', `%${headSearch}%`).limit(8);
-      setHeadResults(data || []);
-    };
-    const t = setTimeout(search, 300);
-    return () => clearTimeout(t);
-  }, [headSearch]);
+      // Guard: Ensure department ID exists before querying
+  if (!myDept?.id) return; 
 
-  const handleCreate = async (e: React.FormEvent) => {
+  if (headSearch.length < 2) {
+    setSearchResults([]);
+    setConflictMsg('');
+    return;
+  }
+
+      if (headSearch.length < 2) {
+        setSearchResults([]);
+        setConflictMsg('');
+        return;
+      }
+      setSearching(true);
+
+      const { data, error } = await supabase
+  .from('profiles')
+  .select(`
+    id, 
+    name, 
+    designation, 
+    division_id, 
+    divisions:profiles_division_id_fkey(name)
+  `)
+  .ilike('name', `%${headSearch}%`)
+  .eq('department_id', myDept?.id)
+  .limit(10);
+      if (error) {
+  // Use console.dir to see the full object properties
+  console.error("Search error details:", JSON.stringify(error, null, 2));
+} else {
+  setSearchResults(data || []);
+}
+      
+      setSearching(false);
+    };
+
+    const timeout = setTimeout(search, 300);
+    return () => clearTimeout(timeout);
+  }, [headSearch, myDept]);
+
+  const handleSelectHead = (staff: any) => {
+    if (staff.division_id && (!selectedDivision || staff.division_id !== selectedDivision.id)) {
+      setConflictMsg(`"${staff.name}" already assigned elsewhere.`);
+      return;
+    }
+    setConflictMsg('');
+    setSelectedHead(staff);
+    setHeadSearch('');
+    setSearchResults([]);
+  };
+
+  const handleCreateDivision = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!newName || !myDept) return;
     setSubmitting(true);
     setError('');
 
-    const isHq = profile?.role === 'SUPER_ADMIN';
-    const centreId = profile?.centre_id;
+    const { data: division, error: divisionError } = await supabase
+      .from('divisions')
+      .insert({
+        name: newName,
+        code: newCode || null,
+        department_id: myDept.id,
+        head_id: selectedHead?.id || null,
+      })
+      .select()
+      .single();
 
-    if (formType === 'division') {
-      const { error: err } = await supabase.from('divisions').insert({
-        name: form.name, is_hq: isHq,
-        centre_id: isHq ? null : centreId,
-        head_id: selectedHead?.id || null,
-      });
-      if (err) { setError(err.message); setSubmitting(false); return; }
-      if (selectedHead?.role !== 'SUPER_ADMIN') {
-        await supabase.from('profiles').update({ role: 'DIVISION_HEAD' }).eq('id', selectedHead.id);
-      }
-    } else if (formType === 'department') {
-      const { error: err } = await supabase.from('departments').insert({
-        name: form.name, is_hq: isHq,
-        centre_id: isHq ? null : centreId,
-        head_id: selectedHead?.id || null,
-      });
-      if (err) { setError(err.message); setSubmitting(false); return; }
-      if (selectedHead?.role !== 'SUPER_ADMIN') {
-        await supabase.from('profiles').update({ role: 'DEPT_HEAD' }).eq('id', selectedHead.id);
-      }
-    } else if (formType === 'unit') {
-      const isDivParent = divisions.find((d: any) => d.id === form.parent_id);
-      const { error: err } = await supabase.from('units').insert({
-        name: form.name,
-        division_id: isDivParent ? form.parent_id : null,
-        department_id: !isDivParent ? form.parent_id : null,
-        head_id: selectedHead?.id || null,
-      });
-      if (err) { setError(err.message); setSubmitting(false); return; }
-      if (selectedHead?.role !== 'SUPER_ADMIN') {
-        await supabase.from('profiles').update({ role: 'UNIT_HEAD' }).eq('id', selectedHead.id);
-      }
+    if (divisionError) {
+      setError(divisionError.message);
+      setSubmitting(false);
+      return;
     }
 
-    setForm({ name: '', parent_id: '' });
-    setSelectedHead(null);
-    setHeadSearch('');
-    setShowForm(false);
-    await fetchAll(profile);
+    // Replace your current logic block with this:
+if (selectedHead && division) {
+  if (selectedHead.role !== 'DG') {
+    const { error } = await supabase
+      .from('profiles')
+      .update({ 
+        role: 'DIVISION_HEAD', 
+        division_id: division.id, 
+        department_id: myDept.id 
+      })
+      .eq('id', selectedHead.id);
+
+    if (error) {
+      console.error("ROLE UPDATE FAILED:", error);
+      setError("Division created, but failed to update user role.");
+    }
+  }
+}
+
+    setNewName("");
+    setNewCode("");
+    resetFormState();
+    setShowCreateModal(false);
+    loadDivisionsScreen();
     setSubmitting(false);
   };
 
-  const isDivisionOrDeptHead = profile?.role === 'DIVISION_HEAD' || profile?.role === 'DEPT_HEAD';
-  const isUnitHead = profile?.role === 'UNIT_HEAD';
-  const canCreate = ['SUPER_ADMIN', 'CENTRE_ADMIN', 'DIVISION_HEAD', 'DEPT_HEAD'].includes(profile?.role);
+  const handleUpdate = async (e: React.FormEvent) => {
+  e.preventDefault();
+  if (!selectedDivision) return;
+  setSubmitting(true);
 
-  const getAvailableForms = () => {
-    if (profile?.role === 'SUPER_ADMIN' || profile?.role === 'CENTRE_ADMIN') return ['division', 'department', 'unit'];
-    if (isDivisionOrDeptHead) return ['unit'];
-    return [];
+  const { error } = await supabase
+    .from('divisions')
+    .update({ 
+      name: editName, 
+      description: editDescription,
+      head_id: selectedHead?.id || null 
+    })
+    .eq('id', selectedDivision.id);
+  
+  if (!error && selectedHead) {
+     await supabase.from('profiles').update({ role: 'DIVISION_HEAD', division_id: selectedDivision.id }).eq('id', selectedHead.id);
+  }
+  
+  setShowManageModal(false);
+  loadDivisionsScreen();
+  setSubmitting(false);
+};
+
+  const handleDeleteDivision = async () => {
+    if (!selectedDivision) return;
+    const confirmRemoval = confirm(`Are you completely sure you want to delete ${selectedDivision.name}?`);
+    if (!confirmRemoval) return;
+
+    await supabase.from('divisions').delete().eq('id', selectedDivision.id);
+    setShowManageModal(false);
+    resetFormState();
+    loadDivisionsScreen();
   };
 
-  const pageTitle = isDivisionOrDeptHead ? 'Manage Units' : isUnitHead ? 'My Unit' : 'Manage Divisions';
+  const resetFormState = () => {
+    setSelectedDivision(null);
+    setSelectedHead(null);
+    setHeadSearch('');
+    setSearchResults([]);
+    setConflictMsg('');
+    setError('');
+  };
+
+  const getStaffSubtitle = (staff: any) => {
+    const parts = [];
+    if (staff.designation) parts.push(staff.designation);
+    if (staff.divisions?.name) parts.push(staff.divisions.name);
+    if (staff.units?.name) parts.push(staff.units.name);
+    return parts.join(' · ') || 'No designation';
+  };
+
+  if (loading) return <div className="loading">Polling divisional infrastructure nodes...</div>;
 
   return (
-    <div className="divisions-page">
-      <div className="page-header">
-        <div>
-          <h1>{pageTitle}</h1>
-          <p>
-            {profile?.role === 'SUPER_ADMIN' ? 'Divisions, departments and units across HQ' :
-             profile?.role === 'CENTRE_ADMIN' ? 'Divisions and departments in your centre' :
-             isDivisionOrDeptHead ? 'Units under your division and your staff' :
-             'Your unit and team'}
-          </p>
+    <div className="divisions-container">
+      
+      {/* Upper Control Panel */}
+      <div className="divisions-header">
+        <div className="divisions-title">
+          <h1>Manage Departmental Divisions</h1>
+          <p>Sector Track: <strong>Department of {myDept?.name}</strong></p>
         </div>
-        {canCreate && (
-          <button className="btn" onClick={() => setShowForm(!showForm)}>
-            {showForm ? 'Cancel' : isDivisionOrDeptHead ? '+ Create Unit' : '+ Create New'}
-          </button>
+        <button className="create-btn" onClick={() => { resetFormState(); setShowCreateModal(true); }}>
+          + Create Division Node
+        </button>
+      </div>
+
+      {/* Grid Layout Container */}
+      <div className="divisions-grid">
+        {divisions.length === 0 ? (
+          <div className="empty-state" style={{ gridColumn: '1/-1' }}>
+            No administrative divisions registered under this sector track. Click above to initialize a node.
+          </div>
+        ) : (
+          divisions.map((div) => (
+            <div 
+              key={div.id} 
+              className="division-card"
+              onClick={() => router.push(`/staff/divisions/${div.id}`)}
+            >
+              <div className="division-card-header">
+    <div className="division-name">{div.name}</div>
+
+    <button
+      className="manage-node-btn"
+      onClick={(e) => {
+        e.stopPropagation();
+        setSelectedDivision(div);
+        setEditName(div.name);
+        setEditDescription(div.description || "");
+        setSelectedHead(div.division_head?.name || null);
+        setShowManageModal(true);
+      }}
+    >
+      Manage
+    </button>
+</div>
+
+              <div className="division-meta">
+                <div className="meta-item">Division Code: <strong>{div.code || 'N/A'}</strong></div>
+                <div className="meta-item">Appointed Head: <strong>{div.division_head?.name || 'Vacant Node'}</strong></div>
+                <div className="meta-item">Staff Members: <strong>{div.staffCount || 0}</strong></div>
+              </div>
+            </div>
+          ))
         )}
       </div>
 
-      {/* Tabs for division/dept heads */}
-      {isDivisionOrDeptHead && (
-        <div className="div-tabs">
-          <button className={`div-tab ${activeTab === 'structure' ? 'active' : ''}`}
-            onClick={() => setActiveTab('structure')}>Units</button>
-          <button className={`div-tab ${activeTab === 'staff' ? 'active' : ''}`}
-            onClick={() => setActiveTab('staff')}>Staff ({divisionStaff.length})</button>
-        </div>
-      )}
-
-      {showForm && (
-        <div className="form-card">
-          {getAvailableForms().length > 1 && (
-            <div className="type-toggle" style={{ marginBottom: 20 }}>
-              {getAvailableForms().map((t) => (
-                <button key={t} type="button"
-                  className={`type-btn ${formType === t ? 'active' : ''}`}
-                  onClick={() => setFormType(t as any)}>
-                  {t.charAt(0).toUpperCase() + t.slice(1)}
-                </button>
-              ))}
+      {/* POPUP MODAL 1: INITIALIZE NEW DIVISION */}
+      {showCreateModal && (
+        <div className="modal-overlay">
+          <form className="modal-content" onSubmit={handleCreateDivision}>
+            <div className="modal-header-row">
+              <div className="modal-title">Initialize New Division</div>
+              <button type="button" className="modal-close-x" onClick={() => setShowCreateModal(false)}>✕</button>
             </div>
-          )}
-
-          <form onSubmit={handleCreate}>
+            
             <div className="form-group">
-              <label>{isDivisionOrDeptHead ? 'Unit' : formType.charAt(0).toUpperCase() + formType.slice(1)} Name</label>
-              <input type="text" className="input-field"
-                placeholder={isDivisionOrDeptHead ? 'e.g. Ground Operations Unit' :
-                  formType === 'division' ? 'e.g. Engineering Division' :
-                  formType === 'department' ? 'e.g. Finance Department' : 'e.g. Ground Operations Unit'}
-                value={form.name}
-                onChange={(e) => setForm({ ...form, name: e.target.value })} required />
+              <label>Division Name</label>
+              <input 
+                type="text" 
+                className="input-field" 
+                required 
+                placeholder="e.g. Space Hardware Architecture Division"
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+              />
             </div>
 
-            {formType === 'unit' && !isDivisionOrDeptHead && (
-              <div className="form-group">
-                <label>Parent Division or Department</label>
-                <select className="input-field" value={form.parent_id}
-                  onChange={(e) => setForm({ ...form, parent_id: e.target.value })} required>
-                  <option value="">— Select Parent —</option>
-                  {divisions.length > 0 && <optgroup label="Divisions">
-                    {divisions.map((d: any) => <option key={d.id} value={d.id}>{d.name}</option>)}
-                  </optgroup>}
-                  {departments.length > 0 && <optgroup label="Departments">
-                    {departments.map((d: any) => <option key={d.id} value={d.id}>{d.name}</option>)}
-                  </optgroup>}
-                </select>
-              </div>
-            )}
+            <div className="form-group">
+              <label>Division Identifier Code</label>
+              <input 
+                type="text" 
+                className="input-field" 
+                placeholder="e.g. SHAD"
+                value={newCode}
+                onChange={(e) => setNewCode(e.target.value)}
+              />
+            </div>
 
             <div className="form-group">
-              <label>Assign Head (optional)</label>
+              <label>Assign Head / Director (optional)</label>
               {selectedHead ? (
                 <div className="selected-head">
                   <div className="selected-head-info">
-                    <div className="search-avatar">{selectedHead.name.slice(0, 2).toUpperCase()}</div>
+                    <div className="selected-avatar">
+                      {selectedHead?.name?.slice(0, 2).toUpperCase() || '??'}
+                    </div>
                     <div>
-                      <div className="search-name">{selectedHead.name}</div>
-                      <div className="search-designation">{selectedHead.designation}</div>
+                      <div className="selected-name">{selectedHead.name}</div>
+                      <div className="selected-designation">{selectedHead.designation || 'Active Profile'}</div>
                     </div>
                   </div>
-                  <button type="button" className="remove-btn"
-                    onClick={() => { setSelectedHead(null); setHeadSearch(''); }}>✕</button>
+                  <button
+                    type="button"
+                    className="remove-head-btn"
+                    onClick={() => { setSelectedHead(null); setHeadSearch(''); }}
+                  >
+                    ✕ Remove
+                  </button>
                 </div>
               ) : (
                 <div className="search-wrapper">
-                  <input type="text" className="input-field" placeholder="Search by name..."
-                    value={headSearch} onChange={(e) => setHeadSearch(e.target.value)} />
-                  {headResults.length > 0 && (
+                  <input
+                    type="text"
+                    className="input-field"
+                    placeholder="Search by name e.g. John..."
+                    value={headSearch}
+                    onChange={(e) => { setHeadSearch(e.target.value); setConflictMsg(''); }}
+                  />
+                  {headSearch.length >= 2 && (
                     <div className="search-results">
-                      {headResults.map((s: any) => (
-                        <div key={s.id} className="search-item"
-                          onClick={() => { setSelectedHead(s); setHeadSearch(''); setHeadResults([]); }}>
-                          <div className="search-avatar">{s.name.slice(0, 2).toUpperCase()}</div>
-                          <div>
-                            <div className="search-name">{s.name}</div>
-                            <div className="search-designation">{s.designation}</div>
+                      {searching && (
+                        <div className="search-item muted">Searching...</div>
+                      )}
+                      {!searching && searchResults.length === 0 && (
+                        <div className="search-item muted">No staff found</div>
+                      )}
+                      {searchResults.map((staff) => (
+                        <div
+                          key={staff.id}
+                          className="search-item"
+                          onClick={() => handleSelectHead(staff)}
+                        >
+                          <div className="search-avatar">
+                            {staff.name.slice(0, 2).toUpperCase()}
+                          </div>
+                          <div className="search-item-info">
+                            <div className="search-name">{staff.name}</div>
+                            <div className="search-designation">
+                              {getStaffSubtitle(staff)}
+                            </div>
+                            {staff.division_id && (
+                              <div className="search-assigned-tag">
+                                Already assigned · {staff.divisions?.name}
+                              </div>
+                            )}
                           </div>
                         </div>
                       ))}
                     </div>
+                  )}
+                  {conflictMsg && (
+                    <div className="conflict-msg">⚠️ {conflictMsg}</div>
                   )}
                 </div>
               )}
             </div>
 
             {error && <p className="error">{error}</p>}
-            <button type="submit" className="btn" disabled={submitting}>
-              {submitting ? 'Creating...' : `Create ${isDivisionOrDeptHead ? 'Unit' : formType.charAt(0).toUpperCase() + formType.slice(1)}`}
-            </button>
+
+            <div className="modal-actions">
+              <button type="button" className="btn-cancel" onClick={() => setShowCreateModal(false)}>Cancel</button>
+              <button type="submit" className="btn-submit" disabled={submitting}>
+                {submitting ? 'Creating...' : 'Confirm Setup'}
+              </button>
+            </div>
           </form>
         </div>
       )}
 
-      {loading ? <p className="loading">Loading...</p> : (
-        <>
-          {/* Structure tab */}
-          {activeTab === 'structure' && (
-            <div className="divisions-sections">
-              {!isDivisionOrDeptHead && divisions.length > 0 && (
-                <div className="section">
-                  <h2 className="section-heading">Divisions</h2>
-                  <div className="cards-grid">
-                    {divisions.map((d: any) => (
-                      <div key={d.id} className="div-card"
-                        onClick={() => { setSelected(d); setSelectedType('division'); }}>
-                        <div className="div-icon">DV</div>
-                        <div className="div-info">
-                          <div className="div-name">{d.name}</div>
-                          <div className="div-head">{d.profiles?.name ? `Head: ${d.profiles.name}` : 'No head assigned'}</div>
-                          <div className="div-units">{units.filter((u: any) => u.division_id === d.id).length} units</div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {!isDivisionOrDeptHead && departments.length > 0 && (
-                <div className="section">
-                  <h2 className="section-heading">Departments</h2>
-                  <div className="cards-grid">
-                    {departments.map((d: any) => (
-                      <div key={d.id} className="div-card dept"
-                        onClick={() => { setSelected(d); setSelectedType('department'); }}>
-                        <div className="div-icon dept-icon">DP</div>
-                        <div className="div-info">
-                          <div className="div-name">{d.name}</div>
-                          <div className="div-head">{d.profiles?.name ? `Head: ${d.profiles.name}` : 'No head assigned'}</div>
-                          <div className="div-units">{units.filter((u: any) => u.department_id === d.id).length} units</div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {units.length > 0 && (
-                <div className="section">
-                  <h2 className="section-heading">Units</h2>
-                  <div className="cards-grid">
-                    {units.map((u: any) => (
-                      <div key={u.id} className="div-card unit"
-                        onClick={() => { setSelected(u); setSelectedType('unit'); }}>
-                        <div className="div-icon unit-icon">UN</div>
-                        <div className="div-info">
-                          <div className="div-name">{u.name}</div>
-                          <div className="div-head">{u.profiles?.name ? `Head: ${u.profiles.name}` : 'No head assigned'}</div>
-                          <div className="div-units">Under: {u.divisions?.name || u.departments?.name || '—'}</div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {divisions.length === 0 && departments.length === 0 && units.length === 0 && (
-                <div className="empty-state">
-                  <p>{isDivisionOrDeptHead ? 'No units created yet. Click "+ Create Unit" to get started.' : 'No divisions, departments or units created yet.'}</p>
-                </div>
-              )}
+      {/* POPUP MODAL 2: MANAGEMENT CONTROL */}
+      {showManageModal && (
+        <div className="modal-overlay">
+          <div className="modal-content">
+            <div className="modal-header-row">
+              <div className="modal-title">Manage: {selectedDivision?.name}</div>
+              <button type="button" className="modal-close-x" onClick={() => { setShowManageModal(false); resetFormState(); }}>✕</button>
             </div>
-          )}
-
-          {/* Staff tab for division/dept heads */}
-          {activeTab === 'staff' && isDivisionOrDeptHead && (
-            <div className="staff-section">
-              {divisionStaff.length === 0 ? (
-                <div className="empty-state"><p>No staff assigned to your division yet.</p></div>
-              ) : (
-                <div className="staff-list">
-                  {divisionStaff.map((s: any) => (
-                    <div key={s.id} className="staff-row">
-                      <div className="staff-avatar-sm">{s.name?.slice(0, 2).toUpperCase()}</div>
-                      <div className="staff-row-info">
-                        <div className="staff-row-name">{s.name}</div>
-                        <div className="staff-row-meta">{s.designation || 'No designation'} · {s.role}</div>
+            
+            <form onSubmit={handleUpdate}>
+  <div className="form-group">
+    <label>Division Name</label>
+    <input className="input-field" value={editName} onChange={(e) => setEditName(e.target.value)} />
+  </div>
+  <div className="form-group">
+    <label>Description</label>
+    <textarea className="input-field" value={editDescription} onChange={(e) => setEditDescription(e.target.value)} />
+  </div>
+  
+  <label>Update Assigned Division Head</label>
+                {selectedHead ? (
+                  <div className="selected-head">
+                    <div className="selected-head-info">
+                      <div className="selected-avatar">
+                        {selectedHead?.name?.slice(0, 2).toUpperCase() || '??'}
+                      </div>
+                      <div>
+                        <div className="selected-name">{selectedHead.name}</div>
+                        <div className="selected-designation">{selectedHead.designation || 'Active Profile'}</div>
                       </div>
                     </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-        </>
-      )}
+                    <button
+                      type="button"
+                      className="remove-head-btn"
+                      onClick={() => { setSelectedHead(null); setHeadSearch(''); }}
+                    >
+                      ✕ Remove
+                    </button>
+                  </div>
+                ) : (
+                  <div className="search-wrapper">
+                    <input
+                      type="text"
+                      className="input-field"
+                      placeholder="Search by name e.g. John..."
+                      value={headSearch}
+                      onChange={(e) => { setHeadSearch(e.target.value); setConflictMsg(''); }}
+                    />
+                    {headSearch.length >= 2 && (
+                      <div className="search-results">
+                        {searching && (
+                          <div className="search-item muted">Searching...</div>
+                        )}
+                        {!searching && searchResults.length === 0 && (
+                          <div className="search-item muted">No staff found</div>
+                        )}
+                        {searchResults.map((staff) => (
+                          <div
+                            key={staff.id}
+                            className="search-item"
+                            onClick={() => handleSelectHead(staff)}
+                          >
+                            <div className="search-avatar">
+                              {staff.name.slice(0, 2).toUpperCase()}
+                            </div>
+                            <div className="search-item-info">
+                              <div className="search-name">{staff.name}</div>
+                              <div className="search-designation">
+                                {getStaffSubtitle(staff)}
+                              </div>
+                              {staff.division_id && (
+                                <div className="search-assigned-tag">
+                                  Already assigned · {staff.divisions?.name}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {conflictMsg && (
+                      <div className="conflict-msg">⚠️ {conflictMsg}</div>
+                    )}
+                  </div>
+                )}
+  
+  <div className="modal-actions" style={{ justifyContent: 'space-between', marginTop: '40px' }}>
+  <button
+    type="button"
+    className="btn-delete"
+    onClick={handleDeleteDivision}
+  >
+    Delete Node
+  </button>
 
-      {selected && (
-        <div className="modal-overlay" onClick={() => setSelected(null)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h2>{selected.name}</h2>
-              <button className="modal-close" onClick={() => setSelected(null)}>✕</button>
-            </div>
-            <div className="modal-fields">
-              <div className="modal-field">
-                <span className="modal-label">Type</span>
-                <span className="modal-value">{selectedType.charAt(0).toUpperCase() + selectedType.slice(1)}</span>
-              </div>
-              <div className="modal-field">
-                <span className="modal-label">Head</span>
-                <span className="modal-value">{selected.profiles?.name || 'Not assigned'}</span>
-              </div>
-              {selectedType !== 'unit' && (
-                <div className="modal-field">
-                  <span className="modal-label">Units</span>
-                  <span className="modal-value">
-                    {units.filter((u: any) =>
-                      selectedType === 'division' ? u.division_id === selected.id : u.department_id === selected.id
-                    ).length} units
-                  </span>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+  <div style={{ display: 'flex', gap: '12px' }}>
+    <button
+      type="button"
+      className="btn-cancel"
+      onClick={() => {
+        setShowManageModal(false);
+        resetFormState();
+      }}
+    >
+      Cancel
+    </button>
+
+    <button
+      type="submit"
+      className="btn-submit"
+      disabled={submitting}
+    >
+      {submitting ? "Saving..." : "Save Changes"}
+    </button>
+  </div>
+</div>
+
+</form>
+</div>
+</div>
+)}
     </div>
   );
 }

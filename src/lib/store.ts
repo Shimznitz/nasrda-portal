@@ -1,14 +1,15 @@
 // src/lib/store.ts
-// In-memory store for development (no Prisma for now)
 
+import { ROLES } from './roles';
 export type User = {
   id: string;
   name: string;
   staffNo: string;
   email: string;
-  password: string;        // plain text for demo only
+  password: string;
   designation: string;
-  role: 'SUPER_ADMIN' | 'CENTRE_ADMIN' | 'STAFF';
+  // Use the roles that actually exist in your Supabase Enum
+  role: typeof ROLES[keyof typeof ROLES];
 };
 
 let users: User[] = [
@@ -16,15 +17,12 @@ let users: User[] = [
     id: '1',
     name: 'ESS Director',
     staffNo: 'NASRDA/ESS/001',
-    email: 'superadmin@nasrda.gov.ng',
+    email: 'admin@nasrda.gov.ng',
     password: 'admin123',
     designation: 'Director, Engineering & Space Systems',
-    role: 'SUPER_ADMIN',
+    role: ROLES.DG, // Updated from SUPER_ADMIN
   }
 ];
 
-export const store = {
-  users,
-};
-
+export const store = { users };
 export default store;

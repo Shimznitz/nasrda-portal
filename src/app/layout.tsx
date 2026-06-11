@@ -1,20 +1,34 @@
 // src/app/layout.tsx
-import type { Metadata } from "next";
+
+'use client'; // Required to use hooks
+import { useEffect, useState } from "react";
+import { supabase } from "@/lib/supabase";
+import Link from "next/link";
 import "./globals.css";
 
-export const metadata: Metadata = {
-  title: "NASRDA Staff Portal",
-  description: "National Space Research and Development Agency",
-};
+export default function RootLayout({ children }: { children: React.ReactNode }) {
+  const [isAdmin, setIsAdmin] = useState(false);
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+  useEffect(() => {
+    const checkUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single();
+        setIsAdmin(profile?.role === 'admin');
+      }
+    };
+    checkUser();
+  }, []);
+
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        <nav className="navbar">
+          <Link href="/staff/projects">Dashboard</Link>
+          {isAdmin && <Link href="/admin/projects/create">Create Project</Link>}
+        </nav>
+        {children}
+      </body>
     </html>
   );
 }
