@@ -41,7 +41,7 @@ export default function NotificationsPage() {
     const { data } = await supabase
       .from('notifications')
       .select('*')
-      .eq('profile_id', uid)
+      .eq('user_id', uid)
       .order('created_at', { ascending: false })
       .limit(60);
     setNotifications(data || []);
@@ -49,18 +49,18 @@ export default function NotificationsPage() {
   };
 
   const markRead = async (n: any) => {
-    if (!n.is_read) {
-      await supabase.from('notifications').update({ is_read: true }).eq('id', n.id);
-      setNotifications(prev => prev.map((x: any) => x.id === n.id ? { ...x, is_read: true } : x));
+    if (!n.read) {
+      await supabase.from('notifications').update({ read: true }).eq('id', n.id);
+      setNotifications(prev => prev.map((x: any) => x.id === n.id ? { ...x, read: true } : x));
     }
     if (n.link) router.push(n.link);
   };
 
   const markAllRead = async () => {
     if (!userId) return;
-    await supabase.from('notifications').update({ is_read: true })
-      .eq('profile_id', userId).eq('is_read', false);
-    setNotifications(prev => prev.map((n: any) => ({ ...n, is_read: true })));
+    await supabase.from('notifications').update({ read: true })
+      .eq('user_id', userId).eq('read', false);
+    setNotifications(prev => prev.map((n: any) => ({ ...n, read: true })));
   };
 
   const deleteNotification = async (e: React.MouseEvent, id: string) => {
@@ -69,9 +69,9 @@ export default function NotificationsPage() {
     setNotifications(prev => prev.filter((n: any) => n.id !== id));
   };
 
-  const unreadCount = notifications.filter((n: any) => !n.is_read).length;
+  const unreadCount = notifications.filter((n: any) => !n.read).length;
   const visible = filter === 'unread'
-    ? notifications.filter((n: any) => !n.is_read)
+    ? notifications.filter((n: any) => !n.read)
     : notifications;
 
   const grouped = visible.reduce((acc: Record<string, any[]>, n: any) => {
@@ -128,7 +128,7 @@ export default function NotificationsPage() {
                   return (
                     <div
                       key={n.id}
-                      className={`notif-card ${!n.is_read ? 'unread' : ''} ${n.link ? 'clickable' : ''}`}
+                      className={`notif-card ${!n.read ? 'unread' : ''} ${n.link ? 'clickable' : ''}`}
                       onClick={() => markRead(n)}
                     >
                       <div className="notif-icon-wrap">
@@ -143,7 +143,7 @@ export default function NotificationsPage() {
                           {n.link && <span className="notif-link-hint"> · tap to open →</span>}
                         </div>
                       </div>
-                      {!n.is_read && <div className="unread-dot" />}
+                      {!n.read && <div className="unread-dot" />}
                       <button
                         className="notif-dismiss"
                         onClick={(e) => deleteNotification(e, n.id)}
