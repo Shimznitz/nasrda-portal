@@ -16,7 +16,7 @@
   min-height: 50vh;
   gap: 16px;
   color: var(--text3);
-  font-size: 0.9rem;
+  font-size: 0.88rem;
 }
 
 .db-loading-bar {
@@ -48,21 +48,17 @@
   align-items: flex-start;
   justify-content: space-between;
   gap: 20px;
-  margin-bottom: 40px;
+  margin-bottom: 36px;
   flex-wrap: wrap;
 }
 
-.db-header-left {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
+.db-header-left { display: flex; flex-direction: column; gap: 4px; }
 
 .db-eyebrow {
-  font-size: 0.78rem;
+  font-size: 0.72rem;
   color: var(--text3);
   text-transform: uppercase;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.14em;
   font-family: 'IBM Plex Mono', monospace;
   margin: 0;
 }
@@ -72,64 +68,81 @@
   font-weight: 700;
   color: var(--text);
   margin: 0;
-  line-height: 1.1;
+  line-height: 1.05;
   letter-spacing: -0.02em;
 }
 
-.db-title-dot {
-  color: var(--gold);
-}
+.db-title-dot { color: var(--gold); }
 
 .db-subtitle {
-  font-size: 0.95rem;
+  font-size: 0.92rem;
   color: var(--text3);
-  margin: 6px 0 0;
+  margin: 4px 0 0;
+}
+
+.db-breadcrumb {
+  color: var(--text3);
+  font-size: 0.85rem;
+}
+
+.db-ess-tag {
+  display: inline-block;
+  background: var(--gold-dim);
+  color: var(--gold);
+  border: 1px solid rgba(201,168,76,0.3);
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  font-family: 'IBM Plex Mono', monospace;
+  letter-spacing: 0.08em;
+  margin-left: 10px;
+  vertical-align: middle;
 }
 
 .db-role-badge {
   background: var(--gold-dim);
   color: var(--gold);
-  border: 1px solid rgba(201, 168, 76, 0.3);
+  border: 1px solid rgba(201,168,76,0.3);
   padding: 6px 16px;
   border-radius: 9999px;
-  font-size: 0.75rem;
+  font-size: 0.72rem;
   font-weight: 600;
   letter-spacing: 0.06em;
   white-space: nowrap;
   align-self: flex-start;
-  margin-top: 8px;
+  margin-top: 6px;
   font-family: 'IBM Plex Mono', monospace;
 }
 
 /* ── Metrics ──────────────────────────────────── */
 .db-metrics {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 16px;
-  margin-bottom: 32px;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+  margin-bottom: 28px;
 }
+
+.db-metrics-5 { grid-template-columns: repeat(5, 1fr); }
 
 .db-metric {
   background: var(--bg2);
   border: 1px solid var(--border);
   border-radius: 16px;
-  padding: 28px 24px;
+  padding: 24px 20px;
   text-align: center;
   transition: border-color 0.2s, transform 0.2s;
 }
 
-.db-metric:hover {
-  border-color: var(--gold);
-  transform: translateY(-2px);
-}
+.db-metric:hover { border-color: var(--gold); transform: translateY(-2px); }
 
 .db-metric.db-metric-accent {
   background: var(--gold-dim);
-  border-color: rgba(201, 168, 76, 0.3);
+  border-color: rgba(201,168,76,0.3);
 }
 
 .db-metric-value {
-  font-size: 2.8rem;
+  font-size: 2.4rem;
   font-weight: 700;
   color: var(--gold);
   font-family: 'IBM Plex Mono', monospace;
@@ -138,58 +151,60 @@
 }
 
 .db-metric-label {
-  font-size: 0.78rem;
+  font-size: 0.72rem;
   color: var(--text3);
   text-transform: uppercase;
   letter-spacing: 0.08em;
 }
 
-/* ── Grid ─────────────────────────────────────── */
-.db-grid {
-  display: grid;
-  gap: 24px;
-}
-
-.db-grid-2 {
-  grid-template-columns: 3fr 2fr;
-}
-
-.db-grid-1 {
-  grid-template-columns: 1fr;
-  max-width: 720px;
-}
+/* ── Grid layouts ─────────────────────────────── */
+.db-grid { display: grid; gap: 20px; }
+.db-grid-2 { grid-template-columns: 1.4fr 1fr; }
+.db-col-stack { display: flex; flex-direction: column; gap: 20px; }
 
 /* ── Panel ────────────────────────────────────── */
 .db-panel {
   background: var(--bg2);
   border: 1px solid var(--border);
   border-radius: 18px;
-  padding: 24px 28px;
+  padding: 22px 24px;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 14px;
 }
+
+.db-panel-tall { min-height: 360px; }
 
 .db-panel-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  flex-shrink: 0;
 }
 
 .db-panel-title {
-  font-size: 0.72rem;
+  font-size: 0.68rem;
   color: var(--text3);
   text-transform: uppercase;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.14em;
   font-family: 'IBM Plex Mono', monospace;
   font-weight: 600;
+}
+
+.db-panel-count {
+  font-size: 0.72rem;
+  color: var(--gold);
+  font-family: 'IBM Plex Mono', monospace;
+  background: var(--gold-dim);
+  padding: 2px 10px;
+  border-radius: 9999px;
 }
 
 .db-panel-link {
   background: none;
   border: none;
   color: var(--gold);
-  font-size: 0.82rem;
+  font-size: 0.78rem;
   cursor: pointer;
   padding: 0;
   font-family: 'IBM Plex Mono', monospace;
@@ -197,61 +212,100 @@
 
 .db-panel-link:hover { text-decoration: underline; }
 
-/* ── Empty state ──────────────────────────────── */
-.db-empty {
-  padding: 32px 20px;
-  text-align: center;
-  border: 1px dashed var(--border);
-  border-radius: 12px;
+/* ── Department / Division rows ───────────────── */
+.db-dept-list { display: flex; flex-direction: column; gap: 2px; overflow-y: auto; }
+
+.db-dept-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
 }
 
-.db-empty p {
-  color: var(--text3);
+.db-dept-row:last-child { border-bottom: none; }
+
+.db-dept-left { flex: 1; min-width: 0; }
+
+.db-dept-name {
   font-size: 0.88rem;
-  margin: 0 0 12px;
+  font-weight: 500;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
-.db-empty button {
-  background: none;
+.db-dept-head {
+  font-size: 0.72rem;
+  color: var(--text3);
+  margin-top: 2px;
+  font-family: 'IBM Plex Mono', monospace;
+}
+
+.db-dept-stats { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; flex-shrink: 0; }
+
+.db-dept-chip {
+  font-size: 0.68rem;
+  background: var(--bg3);
   border: 1px solid var(--border);
-  color: var(--text2);
-  padding: 8px 16px;
-  border-radius: 8px;
-  font-size: 0.82rem;
-  cursor: pointer;
-  transition: border-color 0.15s, color 0.15s;
+  color: var(--text3);
+  padding: 2px 8px;
+  border-radius: 9999px;
+  white-space: nowrap;
 }
 
-.db-empty button:hover { border-color: var(--gold); color: var(--gold); }
+.db-dept-chip.gold { background: var(--gold-dim); color: var(--gold); border-color: rgba(201,168,76,0.2); }
+
+.db-code-tag {
+  font-size: 0.6rem;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  color: var(--text3);
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-family: 'IBM Plex Mono', monospace;
+}
+
+/* ── Progress bar ─────────────────────────────── */
+.db-prog-track {
+  height: 3px;
+  background: var(--border);
+  border-radius: 9999px;
+  overflow: hidden;
+  margin: 6px 0 4px;
+}
+
+.db-prog-fill {
+  height: 100%;
+  background: var(--gold);
+  border-radius: 9999px;
+  transition: width 0.4s ease;
+}
 
 /* ── Project rows ─────────────────────────────── */
-.db-project-list {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
+.db-project-list { display: flex; flex-direction: column; }
 
 .db-project-row {
-  padding: 14px 0;
+  padding: 12px 0;
   border-bottom: 1px solid var(--border);
   cursor: pointer;
   transition: padding-left 0.15s;
 }
 
 .db-project-row:last-child { border-bottom: none; }
-
-.db-project-row:hover { padding-left: 6px; }
+.db-project-row:hover { padding-left: 5px; }
 
 .db-project-row-top {
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 12px;
-  margin-bottom: 10px;
 }
 
 .db-project-name {
-  font-size: 0.92rem;
+  font-size: 0.88rem;
   font-weight: 500;
   color: var(--text);
   flex: 1;
@@ -262,85 +316,59 @@
 }
 
 .db-status {
-  font-size: 0.72rem;
+  font-size: 0.65rem;
   font-weight: 600;
-  padding: 3px 10px;
+  padding: 3px 9px;
   border-radius: 9999px;
   white-space: nowrap;
   flex-shrink: 0;
   letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 
 .db-status-active { background: rgba(201,168,76,0.12); color: var(--gold); }
 .db-status-review { background: rgba(100,220,180,0.12); color: #64dcb4; }
 .db-status-done   { background: rgba(100,200,100,0.12); color: #64c864; }
 
-.db-progress-track {
-  height: 3px;
-  background: var(--border);
-  border-radius: 9999px;
-  overflow: hidden;
-  margin-bottom: 6px;
-}
-
-.db-progress-fill {
-  height: 100%;
-  background: var(--gold);
-  border-radius: 9999px;
-  transition: width 0.4s ease;
-}
-
 .db-project-row-meta {
   display: flex;
   justify-content: space-between;
-  font-size: 0.72rem;
+  font-size: 0.68rem;
   color: var(--text3);
   font-family: 'IBM Plex Mono', monospace;
 }
 
 /* ── Task rows ────────────────────────────────── */
-.db-task-list {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
+.db-task-list { display: flex; flex-direction: column; }
 
 .db-task-row {
   display: flex;
   align-items: flex-start;
-  gap: 12px;
-  padding: 12px 0;
+  gap: 10px;
+  padding: 10px 0;
   border-bottom: 1px solid var(--border);
 }
 
 .db-task-row:last-child { border-bottom: none; }
 
 .db-task-dot {
-  width: 7px;
-  height: 7px;
+  width: 6px; height: 6px;
   border-radius: 50%;
   background: var(--gold);
   flex-shrink: 0;
-  margin-top: 6px;
+  margin-top: 7px;
 }
 
-.db-task-dot-review {
-  background: #64dcb4;
-}
+.db-task-dot-review { background: #64dcb4; }
 
 .db-task-body { flex: 1; min-width: 0; }
 
-.db-task-title {
-  font-size: 0.88rem;
-  font-weight: 500;
-  color: var(--text);
-  margin-bottom: 3px;
-}
+.db-task-title { font-size: 0.85rem; font-weight: 500; color: var(--text); margin-bottom: 2px; }
 
 .db-task-meta {
   display: flex;
-  gap: 10px;
-  font-size: 0.72rem;
+  gap: 8px;
+  font-size: 0.68rem;
   color: var(--text3);
   flex-wrap: wrap;
 }
@@ -348,26 +376,113 @@
 .db-overdue { color: #e05c5c; }
 
 .db-task-status {
-  font-size: 0.68rem;
+  font-size: 0.62rem;
   color: var(--text3);
   font-family: 'IBM Plex Mono', monospace;
   white-space: nowrap;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.04em;
   flex-shrink: 0;
   margin-top: 4px;
 }
 
+/* ── Ring chart ───────────────────────────────── */
+.db-panel-ring { align-items: center; }
+
+.db-ring-wrap {
+  position: relative;
+  width: 120px;
+  height: 120px;
+  margin: 0 auto;
+}
+
+.db-ring-svg { width: 120px; height: 120px; }
+
+.db-ring-label {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.db-ring-value {
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: var(--gold);
+  font-family: 'IBM Plex Mono', monospace;
+  line-height: 1;
+}
+
+.db-ring-sub {
+  font-size: 0.65rem;
+  color: var(--text3);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-top: 2px;
+}
+
+.db-ring-legend {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+}
+
+.db-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.72rem;
+  color: var(--text3);
+}
+
+.db-legend-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.db-legend-dot.gold { background: var(--gold); }
+.db-legend-dot.muted { background: var(--border); }
+
+/* ── Empty ────────────────────────────────────── */
+.db-empty {
+  padding: 28px 16px;
+  text-align: center;
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+}
+
+.db-empty p { color: var(--text3); font-size: 0.85rem; margin: 0 0 10px; }
+
+.db-empty button {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text2);
+  padding: 7px 14px;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.db-empty button:hover { border-color: var(--gold); color: var(--gold); }
+
+.db-empty-hint { color: var(--text3); font-size: 0.82rem; margin: 0; padding: 8px 0; }
+
 /* ── Responsive ───────────────────────────────── */
-@media (max-width: 900px) {
-  .db-metrics { grid-template-columns: 1fr 1fr; }
-  .db-grid-2  { grid-template-columns: 1fr; }
-  .db-title   { font-size: 2.2rem; }
+@media (max-width: 960px) {
+  .db-metrics   { grid-template-columns: repeat(3, 1fr); }
+  .db-metrics-5 { grid-template-columns: repeat(3, 1fr); }
+  .db-grid-2    { grid-template-columns: 1fr; }
+  .db-title     { font-size: 2.4rem; }
 }
 
 @media (max-width: 600px) {
   .dashboard-page { padding: 24px 16px; }
-  .db-metrics     { grid-template-columns: 1fr; }
+  .db-metrics     { grid-template-columns: 1fr 1fr; }
+  .db-metrics-5   { grid-template-columns: 1fr 1fr; }
   .db-header      { flex-direction: column; }
   .db-role-badge  { align-self: flex-start; }
+  .db-title       { font-size: 2rem; }
 }
