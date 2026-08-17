@@ -1,0 +1,41 @@
+/*src/app/staff/activity/activity.css*/
+.act-page { max-width: 900px; margin: 0 auto; padding: 40px 24px; }
+
+.act-header { margin-bottom: 24px; }
+.act-title { font-size: 2rem; font-weight: 700; color: var(--text); margin: 0 0 4px; }
+.act-sub { font-size: 0.85rem; color: var(--text3); margin: 0; font-family: 'IBM Plex Mono', monospace; }
+
+.act-controls { display: flex; gap: 10px; margin-bottom: 24px; flex-wrap: wrap; }
+.act-search { flex: 1; min-width: 200px; background: var(--bg2); border: 1px solid var(--border); border-radius: 10px; padding: 9px 13px; color: var(--text); font-size: 0.88rem; font-family: 'IBM Plex Sans', sans-serif; transition: border-color 0.15s; }
+.act-search:focus { outline: none; border-color: var(--gold); }
+.act-filter { background: var(--bg2); border: 1px solid var(--border); border-radius: 10px; padding: 9px 12px; color: var(--text); font-size: 0.82rem; cursor: pointer; min-width: 140px; }
+
+.act-loading { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 30vh; gap: 16px; color: var(--text3); font-size: 0.88rem; }
+.act-loading-bar { width: 140px; height: 2px; background: var(--border); border-radius: 9999px; overflow: hidden; position: relative; }
+.act-loading-bar::after { content: ''; position: absolute; inset: 0; background: var(--gold); border-radius: 9999px; animation: act-sweep 1.4s ease-in-out infinite; }
+@keyframes act-sweep { 0% { transform: translateX(-100%); } 100% { transform: translateX(200%); } }
+
+.act-empty { text-align: center; padding: 60px 20px; background: var(--bg2); border: 1px dashed var(--border); border-radius: 16px; color: var(--text3); }
+
+.act-groups { display: flex; flex-direction: column; gap: 28px; }
+.act-group-label { font-size: 0.7rem; color: var(--text3); text-transform: uppercase; letter-spacing: 0.12em; font-family: 'IBM Plex Mono', monospace; margin-bottom: 10px; }
+.act-list { display: flex; flex-direction: column; gap: 2px; }
+
+.act-entry { display: flex; align-items: flex-start; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+.act-entry:last-child { border-bottom: none; }
+
+.act-icon { width: 28px; height: 28px; border-radius: 8px; border: 1px solid; display: flex; align-items: center; justify-content: center; font-size: 0.82rem; flex-shrink: 0; background: var(--bg3); }
+
+.act-body { flex: 1; min-width: 0; }
+.act-line { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 3px; }
+.act-actor { font-size: 0.88rem; font-weight: 600; color: var(--text); }
+.act-action { font-size: 0.82rem; font-weight: 500; }
+.act-entity-tag { font-size: 0.72rem; background: var(--bg3); border: 1px solid var(--border); color: var(--text3); padding: 1px 7px; border-radius: 9999px; }
+.act-note { font-size: 0.8rem; color: var(--text3); margin-bottom: 3px; font-style: italic; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.act-time { font-size: 0.68rem; color: var(--text3); font-family: 'IBM Plex Mono', monospace; }
+
+.act-pagination { display: flex; align-items: center; justify-content: center; gap: 16px; margin-top: 32px; padding-top: 20px; border-top: 1px solid var(--border); }
+.act-page-btn { background: var(--bg2); border: 1px solid var(--border); color: var(--text2); padding: 8px 16px; border-radius: 9px; font-size: 0.82rem; cursor: pointer; transition: all 0.15s; }
+.act-page-btn:hover { border-color: var(--gold); color: var(--gold); }
+.act-page-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.act-page-num { font-size: 0.78rem; color: var(--text3); font-family: 'IBM Plex Mono', monospace; }

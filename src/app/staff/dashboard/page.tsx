@@ -275,11 +275,17 @@ function DeptAdminDashboard({ profile }: { profile: any }) {
 
       const activeProjects = (projs || []).filter(p => p.status !== 'COMPLETED').length;
 
-      const { count: pendingTasks } = await supabase
-        .from('tasks')
-        .select('id', { count: 'exact', head: true })
-        .in('project_id', (projs || []).map(p => p.id))
-        .neq('status', 'COMPLETED');
+      const projIds = (projs || []).map(p => p.id);
+      let pendingTasksCount = 0;
+
+      if (projIds.length > 0) {
+        const { count } = await supabase
+          .from('tasks')
+          .select('id', { count: 'exact', head: true })
+          .in('project_id', projIds)
+          .neq('status', 'COMPLETED');
+        pendingTasksCount = count ?? 0;
+      }
 
       if (ess) {
         const { data: centreData } = await supabase
@@ -294,7 +300,7 @@ function DeptAdminDashboard({ profile }: { profile: any }) {
         divisionCount: divs?.length ?? 0,
         unitCount: unitCount ?? 0,
         activeProjects,
-        pendingTasks: pendingTasks ?? 0,
+        pendingTasks: pendingTasksCount,
       });
       setDivisions(divsWithCounts);
       setProjects(projs || []);
@@ -664,6 +670,7 @@ function UnitHeadDashboard({ profile }: { profile: any }) {
         setTasks(taskData || []);
       } else {
         setStats({ staffCount: staffCount ?? 0, activeProjects: 0, pendingTasks: 0 });
+        setTasks([]);
       }
       setProjects(projData || []);
       setLoading(false);
@@ -795,6 +802,10 @@ function StaffDashboard({ profile }: { profile: any }) {
         setProjects(projs || []);
         setTasks(openTasks || []);
         setStats({ totalProjects: ids.length, openTasks: openTasks?.length ?? 0, completedTasks: completedCount ?? 0 });
+      } else {
+        setProjects([]);
+        setTasks([]);
+        setStats({ totalProjects: 0, openTasks: 0, completedTasks: 0 });
       }
       setLoading(false);
     };

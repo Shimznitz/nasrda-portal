@@ -24,7 +24,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en">
       <body>
         <nav className="navbar">
-          <Link href="/staff/projects">Dashboard</Link>
           {isAdmin && <Link href="/admin/projects/create">Create Project</Link>}
         </nav>
         {children}

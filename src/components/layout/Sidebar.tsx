@@ -20,137 +20,142 @@ export default function Sidebar() {
   const router = useRouter();
   const [profile, setProfile] = useState<any>(null);
   const [isESS, setIsESS] = useState(false);
-  const [unreadCount, setUnreadCount] = useState(0);
+  const [unreadNotif, setUnreadNotif] = useState(0);
+  const [pendingDocs, setPendingDocs] = useState(0);
 
   useEffect(() => {
-    const load = async () => {
+    let mounted = true;
+    let interval: any;
+
+    const init = async () => {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      if (!user || !mounted) return;
 
       const { data: prof } = await supabase
         .from('profiles').select('*').eq('id', user.id).single();
+      if (!mounted) return;
       setProfile(prof);
 
       if (prof?.role === 'DEPT_ADMIN') {
         const { data: dept } = await supabase
           .from('departments').select('name').eq('head_id', user.id).single();
-        if (dept) {
+        if (dept && mounted) {
           const name = dept.name?.toUpperCase();
-          setIsESS(name?.includes('ESS') || name?.includes('ENGINEERING') || name?.includes('SPACE SYSTEMS'));
+          setIsESS(
+            name?.includes('ESS') ||
+            name?.includes('ENGINEERING') ||
+            name?.includes('SPACE SYSTEMS')
+          );
         }
       }
 
-      // Unread notifications
-      const { count } = await supabase
-        .from('notifications')
-        .select('id', { count: 'exact', head: true })
-        .eq('user_id', user.id)
-        .eq('read', false);
-      setUnreadCount(count ?? 0);
+      const fetchBadges = async () => {
+        if (!mounted) return;
+        try {
+          // Unread notifications
+          const { count: notifCount } = await supabase
+            .from('notifications')
+            .select('id', { count: 'exact', head: true })
+            .eq('user_id', user.id)
+            .eq('read', false);
+          if (mounted) setUnreadNotif(notifCount ?? 0);
+
+          // Pending file routes
+          const { data: myRecipients } = await supabase
+            .from('file_route_recipients')
+            .select('id')
+            .eq('profile_id', user.id)
+            .eq('status', 'PENDING');
+          if (mounted) setPendingDocs((myRecipients || []).length);
+        } catch { /* ignore */ }
+      };
+
+      await fetchBadges();
+      interval = setInterval(fetchBadges, 30000);
     };
-    load();
 
-    // Poll unread count every 15s
-    const interval = setInterval(async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-      const { count } = await supabase
-        .from('notifications')
-        .select('id', { count: 'exact', head: true })
-        .eq('user_id', user.id)
-        .eq('read', false);
-      setUnreadCount(count ?? 0);
-    }, 15000);
-
-    return () => clearInterval(interval);
+    init();
+    return () => {
+      mounted = false;
+      if (interval) clearInterval(interval);
+    };
   }, []);
 
   const role = profile?.role;
 
   const getNavItems = (): NavItem[] => {
-    const base: NavItem[] = [
-      { href: '/staff/dashboard', label: 'Dashboard', icon: '⬡' },
-    ];
+    /* ──────────────────────────────────────────────────────────────
+       UNIFIED MODERN ICON SET
+       All items share the same sleek, minimalist geometric family
+    ────────────────────────────────────────────────────────────── */
+    const dashboard:   NavItem = { href: '/staff/dashboard',        label: 'Dashboard',       icon: '⬡' };
+    const triage:      NavItem = { href: '/staff/directory',        label: 'Staff Triage',    icon: '⚡' };
+    const departments: NavItem = { href: '/staff/departments',      label: 'Departments',     icon: '▦' };
+    const divisions:   NavItem = { href: '/staff/divisions',        label: 'Divisions',       icon: '▧' };
+    const units:       NavItem = { href: '/staff/units',            label: 'Units',           icon: '▨' };
+    const centres:     NavItem = { href: '/staff/centres',          label: 'Centres',         icon: '◫' };
+    const labs:        NavItem = { href: '/staff/labs',             label: 'Labs',            icon: '⬢' };
+    
+    const tasks:       NavItem = { href: '/staff/tasks',            label: 'Tasks',           icon: '◈' };
+    const activity:    NavItem = { href: '/staff/activity',         label: 'Activity Log',    icon: '∿' };
+    const documents:   NavItem = { href: '/staff/documents',        label: 'Documents',       icon: '▤' };
+    
+    const directory:   NavItem = { href: '/staff/staff-directory', label: 'Staff Directory', icon: '◓' };
+    const messages:    NavItem = { href: '/staff/messages',        label: 'Messages',        icon: '💬' };
+    const notifications: NavItem = { href: '/staff/notifications', label: 'Notifications',   icon: '🔔' };
+    const profileLink: NavItem = { href: '/staff/profile',         label: 'My Profile',      icon: '◯' };
 
-    const notifications: NavItem = { href: '/staff/notifications', label: 'Notifications', icon: '🔔' };
-    const messages: NavItem = { href: '/staff/messages', label: 'Messages', icon: '💬' };
-    const directory: NavItem = { href: '/staff/staff-directory', label: 'Staff Directory', icon: '👥' };
-    const profile_link: NavItem = { href: '/staff/profile', label: 'My Profile', icon: '◯' };
-    const projects: NavItem = { href: '/staff/projects', label: 'Projects', icon: '◈' };
-    const triage: NavItem = { href: '/staff/directory', label: 'Staff Triage', icon: '⚡' };
+    const allProjects:  NavItem = { href: '/staff/projects', label: 'All Projects',         icon: '❖' };
+    const deptProjects: NavItem = { href: '/staff/projects', label: 'Department Projects',  icon: '❖' };
+    const divProjects:  NavItem = { href: '/staff/projects', label: 'Division Projects',    icon: '❖' };
+    const unitProjects: NavItem = { href: '/staff/projects', label: 'Unit Projects',        icon: '❖' };
+    const myProjects:   NavItem = { href: '/staff/projects', label: 'My Projects',          icon: '❖' };
 
     switch (role) {
       case 'SUPER_ADMIN':
       case 'DG':
         return [
-          ...base,
-          triage,
-          { href: '/staff/departments', label: 'Departments', icon: '▦' },
-          { href: '/staff/centres', label: 'Centres & Labs', icon: '◫' },
-          { ...projects, label: 'All Projects' },
-          directory,
-          messages,
-          notifications,
-          profile_link,
+          dashboard, triage, departments, centres,
+          allProjects, tasks, activity,
+          documents, directory, messages, notifications, profileLink,
         ];
 
       case 'DEPT_ADMIN':
         return [
-          ...base,
-          triage,
-          { href: '/staff/divisions', label: 'Divisions', icon: '▧' },
-          { href: '/staff/units', label: 'Units', icon: '▨' },
-          ...(isESS ? [
-            { href: '/staff/centres', label: 'Centres', icon: '◫' },
-            { href: '/staff/labs', label: 'Labs', icon: '⬡' },
-          ] : []),
-          { ...projects, label: 'Department Projects' },
-          directory,
-          messages,
-          notifications,
-          profile_link,
+          dashboard, triage, divisions, units,
+          ...(isESS ? [centres, labs] : []),
+          deptProjects, tasks, activity,
+          documents, directory, messages, notifications, profileLink,
         ];
 
       case 'DIVISION_HEAD':
         return [
-          ...base,
-          { href: '/staff/units', label: 'Units', icon: '▨' },
-          { ...projects, label: 'Division Projects' },
-          directory,
-          messages,
-          notifications,
-          profile_link,
+          dashboard, units,
+          divProjects, tasks, activity,
+          documents, directory, messages, notifications, profileLink,
         ];
 
       case 'UNIT_HEAD':
         return [
-          ...base,
-          { ...projects, label: 'Unit Projects' },
-          directory,
-          messages,
-          notifications,
-          profile_link,
+          dashboard,
+          unitProjects, tasks, activity,
+          documents, directory, messages, notifications, profileLink,
         ];
 
       case 'CENTRE_ADMIN':
       case 'CENTRE_HEAD':
         return [
-          ...base,
-          { href: '/staff/labs', label: 'Labs', icon: '⬡' },
-          { ...projects, label: 'Centre Projects' },
-          directory,
-          messages,
-          notifications,
-          profile_link,
+          dashboard, labs,
+          { href: '/staff/projects', label: 'Centre Projects', icon: '❖' },
+          tasks, activity,
+          documents, directory, messages, notifications, profileLink,
         ];
 
-      default:
+      default: // STAFF
         return [
-          ...base,
-          { ...projects, label: 'My Projects' },
-          messages,
-          notifications,
-          profile_link,
+          dashboard,
+          myProjects, tasks, activity,
+          documents, directory, messages, notifications, profileLink,
         ];
     }
   };
@@ -163,13 +168,25 @@ export default function Sidebar() {
   };
 
   const name = profile?.name || 'User';
-  const initials = name.split(' ').map((n: string) => n[0]).slice(0, 2).join('').toUpperCase();
+  const avatarInitials = name
+    .split(' ')
+    .map((n: string) => n[0])
+    .slice(0, 2)
+    .join('')
+    .toUpperCase();
+
+  const getBadge = (href: string) => {
+    if (href === '/staff/notifications' && unreadNotif > 0) return unreadNotif;
+    if (href === '/staff/documents' && pendingDocs > 0) return pendingDocs;
+    return null;
+  };
 
   return (
     <aside className="sidebar">
       <div className="logo-section">
         <div className="logo-icon">
-          <Image src="/nasrdalogo.png" alt="NASRDA" width={44} height={44} className="official-logo" priority />
+          <Image src="/nasrdalogo.png" alt="NASRDA" width={44} height={44}
+            className="official-logo" priority />
         </div>
         <div>
           <div className="logo-title">NASRDA</div>
@@ -179,19 +196,21 @@ export default function Sidebar() {
 
       <nav className="nav-section">
         {navItems.map((item) => {
-          const isNotif = item.href === '/staff/notifications';
           const active = pathname === item.href;
+          const badge = getBadge(item.href);
           return (
             <Link
-              key={item.href}
+              key={`${item.href}-${item.label}`}
               href={item.href}
               className={`nav-link ${active ? 'active' : ''}`}
             >
               <span className="nav-icon">{item.icon}</span>
               <span className="nav-label">{item.label}</span>
-              {isNotif && unreadCount > 0 && (
-                <span className="nav-badge">{unreadCount > 99 ? '99+' : unreadCount}</span>
-              )}
+              {badge ? (
+                <span className="nav-badge">
+                  {badge > 99 ? '99+' : badge}
+                </span>
+              ) : null}
             </Link>
           );
         })}
@@ -199,10 +218,12 @@ export default function Sidebar() {
 
       <div className="sidebar-footer">
         <div className="user-info">
-          <div className="user-avatar">{initials}</div>
+          <div className="user-avatar">{avatarInitials}</div>
           <div className="user-details">
             <div className="user-name">{name}</div>
-            <div className="user-staffno">{profile?.staff_no || formatRole(profile?.role || '')}</div>
+            <div className="user-staffno">
+              {profile?.staff_no || formatRole(profile?.role || '')}
+            </div>
           </div>
         </div>
         <button onClick={handleSignOut} className="signout-btn">Sign Out</button>
