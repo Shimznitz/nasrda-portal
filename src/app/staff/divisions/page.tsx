@@ -94,31 +94,48 @@ export default function ManageDivisions() {
   useEffect(() => { loadPage(); }, []);
 
   const loadPage = async () => {
-    setLoading(true);
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+  setLoading(true);
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
 
-      const { data: profile } = await supabase
-        .from('profiles').select('id, role, department_id').eq('id', user.id).single();
-      if (!profile) return;
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('id, role, department_id')
+      .eq('id', user.id)
+      .single();
 
-      let dept: any = null;
-      if (profile.role === 'DEPT_ADMIN') {
-        const { data } = await supabase.from('departments').select('*').eq('head_id', user.id).single();
-        dept = data;
-      } else if (profile.department_id) {
-        const { data } = await supabase.from('departments').select('*').eq('id', profile.department_id).single();
-        dept = data;
-      }
+    if (!profile) return;
 
-      if (!dept) return;
-      setMyDept(dept);
-      await loadDivisions(dept.id);
-    } finally {
-      setLoading(false);
+    let dept: any = null;
+
+    // 1. Check if user is explicitly listed as head_id in departments
+    const { data: headedDept } = await supabase
+      .from('departments')
+      .select('*')
+      .eq('head_id', user.id)
+      .maybeSingle();
+
+    if (headedDept) {
+      dept = headedDept;
+    } else if (profile.department_id) {
+      // 2. Fallback: check the user's assigned department_id
+      const { data: assignedDept } = await supabase
+        .from('departments')
+        .select('*')
+        .eq('id', profile.department_id)
+        .maybeSingle();
+      dept = assignedDept;
     }
-  };
+
+    if (!dept) return;
+
+    setMyDept(dept);
+    await loadDivisions(dept.id);
+  } finally {
+    setLoading(false);
+  }
+};
 
   const loadDivisions = async (deptId: string) => {
     const { data: divs } = await supabase
@@ -173,29 +190,31 @@ export default function ManageDivisions() {
   };
 
   const handleCreate = async () => {
-    if (!newName.trim() || !myDept) { setError('Division name is required.'); return; }
-    setSubmitting(true); setError('');
+  if (!myDept) { setError('Department context missing. Please refresh.'); return; }
+  if (!newName.trim()) { setError('Division name is required.'); return; }
+  
+  setSubmitting(true); setError('');
 
-    const { data: division, error: err } = await supabase.from('divisions').insert({
-      name: newName.trim(),
-      code: newCode.trim() || null,
-      description: newDescription.trim() || null,
-      department_id: myDept.id,
-      head_id: selectedHead?.id || null,
-    }).select().single();
+  const { data: division, error: err } = await supabase.from('divisions').insert({
+    name: newName.trim(),
+    code: newCode.trim() || null,
+    description: newDescription.trim() || null,
+    department_id: myDept.id,
+    head_id: selectedHead?.id || null,
+  }).select().single();
 
-    if (err || !division) { setError(err?.message || 'Failed to create.'); setSubmitting(false); return; }
+  if (err || !division) { setError(err?.message || 'Failed to create.'); setSubmitting(false); return; }
 
-    if (selectedHead?.id) {
-      await supabase.from('profiles').update({
-        role: 'DIVISION_HEAD', division_id: division.id, department_id: myDept.id,
-      }).eq('id', selectedHead.id);
-    }
+  if (selectedHead?.id) {
+    await supabase.from('profiles').update({
+      role: 'DIVISION_HEAD', division_id: division.id, department_id: myDept.id,
+    }).eq('id', selectedHead.id);
+  }
 
-    resetForm(); setShowCreateModal(false);
-    await loadDivisions(myDept.id);
-    setSubmitting(false);
-  };
+  resetForm(); setShowCreateModal(false);
+  await loadDivisions(myDept.id);
+  setSubmitting(false);
+};
 
   const handleUpdate = async () => {
     if (!selectedDivision || !editName.trim()) { setError('Name is required.'); return; }

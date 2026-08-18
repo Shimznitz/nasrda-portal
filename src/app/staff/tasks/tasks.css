@@ -134,3 +134,147 @@ select.st-input { cursor: pointer; }
   .st-task-top { flex-direction: column; }
   .st-task-right { align-items: flex-start; flex-direction: row; flex-wrap: wrap; }
 }
+
+/* ── Overlays and modals ──────────────────────── */
+.st-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.8);
+  backdrop-filter: blur(4px);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 2000; padding: 20px;
+}
+
+.st-modal {
+  background: var(--bg2); border: 1px solid var(--border);
+  border-radius: 20px; padding: 28px;
+  width: 520px; max-width: 100%; max-height: 88vh; overflow-y: auto;
+}
+
+.st-modal-header {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 16px;
+}
+
+.st-modal-header h2 { font-size: 1.15rem; font-weight: 600; color: var(--text); margin: 0; }
+
+.st-modal-close {
+  background: none; border: none; color: var(--text3);
+  font-size: 0.88rem; cursor: pointer; padding: 5px 7px; border-radius: 6px;
+}
+
+.st-modal-close:hover { background: var(--bg3); color: var(--text); }
+
+.st-modal-task-name {
+  font-size: 0.82rem; color: var(--text3);
+  font-family: 'IBM Plex Mono', monospace;
+  margin-bottom: 18px; padding-bottom: 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.st-modal-actions {
+  display: flex; gap: 10px; justify-content: flex-end;
+  margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border);
+}
+
+.st-modal-empty, .st-modal-loading {
+  text-align: center; padding: 24px; color: var(--text3); font-size: 0.88rem;
+}
+
+.st-file-input {
+  width: 100%; padding: 10px; background: var(--bg3);
+  border: 1px dashed var(--border); border-radius: 10px;
+  color: var(--text2); font-size: 0.85rem; cursor: pointer; box-sizing: border-box;
+}
+
+.st-file-hint { font-size: 0.72rem; color: var(--gold); margin-top: 5px; font-family: 'IBM Plex Mono', monospace; }
+
+/* ── Review section ───────────────────────────── */
+.st-review-section { margin-bottom: 14px; }
+
+.st-review-label {
+  font-size: 0.65rem; color: var(--text3); text-transform: uppercase;
+  letter-spacing: 0.1em; font-family: 'IBM Plex Mono', monospace; margin-bottom: 5px;
+}
+
+.st-review-text {
+  font-size: 0.88rem; color: var(--text2); background: var(--bg3);
+  padding: 10px 14px; border-radius: 8px; line-height: 1.5;
+}
+
+.st-review-date { font-size: 0.82rem; color: var(--text2); font-family: 'IBM Plex Mono', monospace; }
+
+/* ── Submission preview on card ───────────────── */
+.st-submission-preview {
+  margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border);
+}
+
+.st-sub-label {
+  font-size: 0.65rem; color: var(--text3); text-transform: uppercase;
+  letter-spacing: 0.1em; font-family: 'IBM Plex Mono', monospace; margin-bottom: 6px;
+}
+
+.st-sub-status { font-weight: 600; }
+.st-sub-status.gold  { color: var(--gold); }
+.st-sub-status.green { color: #64c864; }
+.st-sub-status.red   { color: #e05c5c; }
+
+.st-sub-date { color: var(--text3); font-family: 'IBM Plex Mono', monospace; }
+
+.st-sub-text { font-size: 0.85rem; color: var(--text2); margin-bottom: 8px; line-height: 1.5; }
+
+.st-sub-files { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+
+.st-sub-file {
+  font-size: 0.78rem; color: var(--text2);
+  background: var(--bg3); border: 1px solid var(--border);
+  padding: 4px 10px; border-radius: 9999px; text-decoration: none;
+  transition: border-color 0.15s;
+}
+
+.st-sub-file:hover { border-color: var(--gold); color: var(--gold); }
+
+.st-sub-feedback {
+  font-size: 0.82rem; color: var(--text2); background: var(--bg3);
+  border-left: 2px solid var(--gold); padding: 8px 12px;
+  border-radius: 0 6px 6px 0; line-height: 1.5;
+}
+
+/* ── Route and review buttons ─────────────────── */
+.st-btn-route {
+  background: rgba(167,139,250,0.1); border: 1px solid rgba(167,139,250,0.3);
+  color: #a78bfa; padding: 6px 12px; border-radius: 8px;
+  font-weight: 600; font-size: 0.78rem; cursor: pointer; transition: all 0.15s;
+}
+
+.st-btn-route:hover { background: rgba(167,139,250,0.2); }
+
+.st-btn-review {
+  background: rgba(100,220,180,0.1); border: 1px solid rgba(100,220,180,0.3);
+  color: #64dcb4; padding: 6px 12px; border-radius: 8px;
+  font-weight: 600; font-size: 0.78rem; cursor: pointer; transition: all 0.15s;
+}
+
+.st-btn-review:hover { background: rgba(100,220,180,0.2); }
+
+.st-btn-reject {
+  background: rgba(224,92,92,0.1); border: 1px solid rgba(224,92,92,0.3);
+  color: #e05c5c; padding: 9px 16px; border-radius: 10px;
+  font-weight: 600; font-size: 0.88rem; cursor: pointer; transition: all 0.15s;
+}
+
+.st-btn-reject:hover { background: rgba(224,92,92,0.2); }
+
+/* ── Search selected state ────────────────────── */
+.st-search-item.selected { background: var(--gold-dim); }
+
+.st-selected-pill {
+  display: inline-flex; align-items: center; gap: 5px;
+  background: var(--gold-dim); color: var(--gold);
+  border: 1px solid rgba(201,168,76,0.3);
+  padding: 3px 10px; border-radius: 9999px; font-size: 0.78rem;
+}
+
+.st-selected-pill button {
+  background: none; border: none; color: var(--gold);
+  cursor: pointer; font-size: 0.7rem; padding: 0; line-height: 1;
+}

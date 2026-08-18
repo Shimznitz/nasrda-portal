@@ -8,19 +8,15 @@ import './documents.css';
 const initials = (name: string) =>
   name?.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase() || '??';
 
-const formatTime = (iso: string) =>
-  new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) +
-  ' · ' + new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
 const formatTimeShort = (iso: string) =>
   new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) +
   ' ' + new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
 export default function DocumentsPage() {
-  const [userId, setUserId]   = useState('');
-  const [routes, setRoutes]   = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [filter, setFilter]   = useState<'all' | 'created' | 'received'>('all');
+  const [userId, setUserId]     = useState('');
+  const [routes, setRoutes]     = useState<any[]>([]);
+  const [loading, setLoading]   = useState(true);
+  const [filter, setFilter]     = useState<'all' | 'created' | 'received'>('all');
   const [expanded, setExpanded] = useState<string | null>(null);
 
   useEffect(() => {
@@ -36,97 +32,59 @@ export default function DocumentsPage() {
   const fetchRoutes = async (uid: string) => {
     setLoading(true);
 
-    // 1. Fetch routes created by the user
-    const { data: created } = await supabase
-      .from('file_routes')
-      .select(`
-        id, file_name, file_url, status, created_at, task_id,
-        creator:profiles!created_by(id, name, designation),
-        file_route_recipients(
-          id, profile_id, status, opened_at, completed_at,
-          added_by,
-          profile:profiles!profile_id(name, designation)
-        ),
-        file_route_events(
-          id, action, note, created_at, forwarded_to,
-          actor:profiles!actor_id(name, designation),
-          forwarded_to_profile:profiles!forwarded_to(name)
-        )
-      `)
-      .eq('created_by', uid)
-      .order('created_at', { ascending: false });
+    const selectStr = `
+      id, file_name, file_url, status, created_at, task_id,
+      creator:profiles!created_by(id, name, designation),
+      file_route_recipients(
+        id, profile_id, status, opened_at, completed_at, added_by,
+        profile:profiles(name, designation)
+      ),
+      file_route_events(
+        id, action, note, created_at, forwarded_to,
+        actor:profiles!actor_id(name, designation),
+        forwarded_to_profile:profiles!forwarded_to(name)
+      )
+    `;
 
-    // 2. Fetch routes where user is a recipient
+    const { data: created } = await supabase
+      .from('file_routes').select(selectStr)
+      .eq('created_by', uid).order('created_at', { ascending: false });
+
     const { data: recipRows } = await supabase
-      .from('file_route_recipients')
-      .select('route_id')
-      .eq('profile_id', uid);
+      .from('file_route_recipients').select('route_id').eq('profile_id', uid);
 
     const receivedIds = (recipRows || []).map((r: any) => r.route_id);
     let received: any[] = [];
 
     if (receivedIds.length > 0) {
       const { data: receivedData } = await supabase
-        .from('file_routes')
-        .select(`
-          id, file_name, file_url, status, created_at, task_id,
-          creator:profiles!created_by(id, name, designation),
-          file_route_recipients(
-            id, profile_id, status, opened_at, completed_at,
-            added_by,
-            profile:profiles!profile_id(name, designation)
-          ),
-          file_route_events(
-            id, action, note, created_at, forwarded_to,
-            actor:profiles!actor_id(name, designation),
-            forwarded_to_profile:profiles!forwarded_to(name)
-          )
-        `)
-        .in('id', receivedIds)
-        .order('created_at', { ascending: false }); // Removed .neq('created_by', uid)
-      
+        .from('file_routes').select(selectStr)
+        .in('id', receivedIds).neq('created_by', uid)
+        .order('created_at', { ascending: false });
       received = receivedData || [];
     }
 
-    // 3. Prevent duplicates & categorize roles
-    const createdSet = new Set((created || []).map(r => r.id));
-    
-    const createdList = (created || []).map(r => ({ ...r, _role: 'created' }));
-    const receivedList = received.map(r => ({
-      ...r,
-      // If user created AND received it, keep role as created
-      _role: createdSet.has(r.id) ? 'created' : 'received'
-    }));
-
     const seen = new Set<string>();
-    const allRoutes = [...createdList, ...receivedList].filter(r => {
-      if (seen.has(r.id)) return false;
-      seen.add(r.id);
-      return true;
-    });
+    const allRoutes = [
+      ...(created || []).map(r => ({ ...r, _role: 'created' })),
+      ...received.map(r => ({ ...r, _role: 'received' })),
+    ].filter(r => { if (seen.has(r.id)) return false; seen.add(r.id); return true; });
 
-    // 4. Enrich task & project info
+    // Enrich task info
     const taskIds = [...new Set(allRoutes.filter(r => r.task_id).map(r => r.task_id))];
     let taskMap: Record<string, any> = {};
-
     if (taskIds.length > 0) {
       const { data: tasks } = await supabase
         .from('tasks').select('id, title, project_id').in('id', taskIds);
-      
       const projectIds = [...new Set((tasks || []).filter(t => t.project_id).map(t => t.project_id))];
       let projectMap: Record<string, string> = {};
-      
       if (projectIds.length > 0) {
         const { data: projects } = await supabase
           .from('projects').select('id, title').in('id', projectIds);
         (projects || []).forEach((p: any) => { projectMap[p.id] = p.title; });
       }
-
       (tasks || []).forEach((t: any) => {
-        taskMap[t.id] = { 
-          title: t.title, 
-          project_title: t.project_id ? projectMap[t.project_id] : null 
-        };
+        taskMap[t.id] = { title: t.title, project_title: projectIds.includes(t.project_id) ? projectMap[t.project_id] : null };
       });
     }
 
@@ -136,6 +94,33 @@ export default function DocumentsPage() {
 
     setRoutes(enriched);
     setLoading(false);
+  };
+
+  // Mark as opened when user clicks open file
+  const markOpened = async (routeId: string) => {
+    const { data: myRec } = await supabase
+      .from('file_route_recipients')
+      .select('id, status, opened_at')
+      .eq('route_id', routeId)
+      .eq('profile_id', userId)
+      .maybeSingle();
+
+    if (myRec && !myRec.opened_at) {
+      await supabase.from('file_route_recipients').update({
+        status: 'OPENED',
+        opened_at: new Date().toISOString(),
+      }).eq('id', myRec.id);
+
+      await supabase.from('file_route_events').insert({
+        route_id: routeId,
+        recipient_id: myRec.id,
+        actor_id: userId,
+        action: 'OPENED',
+      });
+
+      // Refresh
+      await fetchRoutes(userId);
+    }
   };
 
   const visible = routes.filter(r => {
@@ -148,7 +133,7 @@ export default function DocumentsPage() {
   const receivedCount = routes.filter(r => r._role === 'received').length;
   const pendingCount  = routes.filter(r => {
     const myRec = r.file_route_recipients?.find((rc: any) => rc.profile_id === userId);
-    return myRec?.status === 'PENDING';
+    return myRec && (myRec.status === 'PENDING' || myRec.status === 'OPENED');
   }).length;
 
   if (loading) return (
@@ -161,13 +146,10 @@ export default function DocumentsPage() {
   return (
     <div className="docs-page">
       <div className="docs-header">
-        <div>
-          <h1 className="docs-title">Documents</h1>
-          <p className="docs-sub">File routing and chain-of-custody tracker</p>
-        </div>
+        <h1 className="docs-title">Documents</h1>
+        <p className="docs-sub">File routing and chain-of-custody tracker</p>
       </div>
 
-      {/* Metrics */}
       <div className="docs-metrics">
         <div className="docs-metric">
           <div className="docs-metric-value">{createdCount}</div>
@@ -179,11 +161,10 @@ export default function DocumentsPage() {
         </div>
         <div className="docs-metric docs-metric-accent">
           <div className="docs-metric-value">{pendingCount}</div>
-          <div className="docs-metric-label">Awaiting action</div>
+          <div className="docs-metric-label">Need action</div>
         </div>
       </div>
 
-      {/* Tabs */}
       <div className="docs-tabs">
         {(['all', 'created', 'received'] as const).map(f => (
           <button key={f} className={`docs-tab ${filter === f ? 'active' : ''}`}
@@ -197,14 +178,14 @@ export default function DocumentsPage() {
         <div className="docs-empty">
           <div className="docs-empty-icon">📂</div>
           <p>No documents yet.</p>
-          <span>Go to a project task and click <strong>Route File</strong> to send a document for review.</span>
+          <span>Go to a project task and click <strong>Route File</strong> to send a document.</span>
         </div>
       ) : (
         <div className="docs-list">
           {visible.map((r: any) => {
             const myRec = r.file_route_recipients?.find((rc: any) => rc.profile_id === userId);
-            const needsAction = myRec?.status === 'PENDING';
-            const isExpanded = expanded === r.id;
+            const needsAction = myRec && (myRec.status === 'PENDING' || myRec.status === 'OPENED');
+            const isExpanded  = expanded === r.id;
             const recipients: any[] = r.file_route_recipients || [];
             const events: any[] = (r.file_route_events || []).sort(
               (a: any, b: any) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
@@ -216,7 +197,8 @@ export default function DocumentsPage() {
               <div key={r.id} className={`docs-card ${needsAction ? 'needs-action' : ''} ${r.status === 'COMPLETED' ? 'completed' : ''}`}>
 
                 {/* Card header */}
-                <div className="docs-card-header" onClick={() => setExpanded(isExpanded ? null : r.id)}>
+                <div className="docs-card-header"
+                  onClick={() => setExpanded(isExpanded ? null : r.id)}>
                   <div className="docs-card-header-left">
                     <div className={`docs-file-type-icon ${r.status === 'COMPLETED' ? 'done' : needsAction ? 'urgent' : ''}`}>
                       📄
@@ -228,6 +210,7 @@ export default function DocumentsPage() {
                         {r.task?.project_title && <span>◈ {r.task.project_title}</span>}
                         {!r.task && <span>Standalone</span>}
                         <span>🕐 {formatTimeShort(r.created_at)}</span>
+                        <span>From: {r.creator?.name}</span>
                       </div>
                     </div>
                   </div>
@@ -240,38 +223,60 @@ export default function DocumentsPage() {
                   </div>
                 </div>
 
-                {/* Quick chain preview — always visible */}
+                {/* Visual chain — originator fans out to ALL recipients in parallel */}
                 <div className="docs-chain-preview">
-                  {/* Originator node */}
-                  <div className="docs-node originator">
-                    <div className="docs-node-avatar gold">{initials(r.creator?.name || '')}</div>
-                    <div className="docs-node-label">{r.creator?.name?.split(' ')[0]}</div>
-                    <div className="docs-node-status-label">Sent</div>
-                  </div>
+                  <div className="docs-chain-inner">
 
-                  {recipients.map((rc: any, i: number) => (
-                    <div key={rc.id} className="docs-chain-segment">
-                      {/* Connector line */}
-                      <div className={`docs-connector ${rc.opened_at ? 'active' : 'inactive'}`}>
-                        <div className="docs-connector-line" />
-                        <div className={`docs-connector-arrow ${rc.opened_at ? 'active' : ''}`}>▶</div>
-                      </div>
-
-                      {/* Recipient node */}
-                      <div className={`docs-node ${rc.status === 'DONE' ? 'done' : rc.opened_at ? 'opened' : 'pending'}`}>
-                        <div className={`docs-node-avatar ${rc.status === 'DONE' ? 'green' : rc.opened_at ? 'teal' : 'grey'}`}>
-                          {initials(rc.profile?.name || '')}
-                        </div>
-                        <div className="docs-node-label">{rc.profile?.name?.split(' ')[0]}</div>
-                        <div className="docs-node-status-label">
-                          {rc.status === 'DONE' ? '✓ Done' : rc.opened_at ? '👁 Opened' : '⏳ Pending'}
-                        </div>
-                        {rc.opened_at && (
-                          <div className="docs-node-time">{formatTimeShort(rc.opened_at)}</div>
-                        )}
-                      </div>
+                    {/* Originator */}
+                    <div className="docs-node originator">
+                      <div className="docs-node-avatar gold">{initials(r.creator?.name || '')}</div>
+                      <div className="docs-node-label">{r.creator?.name?.split(' ')[0]}</div>
+                      <div className="docs-node-sublabel">Originator</div>
                     </div>
-                  ))}
+
+                    {/* Fan-out connector */}
+                    {recipients.length > 0 && (
+                      <div className="docs-fanout">
+                        <div className="docs-fanout-spine" />
+                        <div className="docs-fanout-recipients">
+                          {recipients.map((rc: any) => {
+                            const isMe = rc.profile_id === userId;
+                            const nodeClass = rc.status === 'DONE' ? 'done'
+                              : rc.opened_at ? 'opened' : 'pending';
+                            const avatarClass = rc.status === 'DONE' ? 'green'
+                              : rc.opened_at ? 'teal' : 'grey';
+
+                            return (
+                              <div key={rc.id} className="docs-fanout-row">
+                                <div className={`docs-fanout-line ${rc.opened_at ? 'active' : ''}`} />
+                                <div className={`docs-fanout-arrow ${rc.opened_at ? 'active' : ''}`}>▶</div>
+                                <div className={`docs-node ${nodeClass} ${isMe ? 'is-me' : ''}`}>
+                                  <div className={`docs-node-avatar ${avatarClass}`}>
+                                    {initials(rc.profile?.name || '')}
+                                  </div>
+                                  <div className="docs-node-label">
+                                    {rc.profile?.name?.split(' ')[0]}
+                                    {isMe && <span className="docs-node-me-tag">you</span>}
+                                  </div>
+                                  <div className="docs-node-sublabel">
+                                    {rc.status === 'DONE' ? '✓ Done'
+                                      : rc.opened_at ? '👁 Opened'
+                                      : '⏳ Pending'}
+                                  </div>
+                                  {rc.opened_at && (
+                                    <div className="docs-node-time">{formatTimeShort(rc.opened_at)}</div>
+                                  )}
+                                  {rc.completed_at && (
+                                    <div className="docs-node-time done">{formatTimeShort(rc.completed_at)}</div>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
 
                   {/* Stats */}
                   <div className="docs-chain-summary">
@@ -284,34 +289,64 @@ export default function DocumentsPage() {
                   </div>
                 </div>
 
-                {/* Expanded: full timeline + open link */}
+                {/* Expanded */}
                 {isExpanded && (
                   <div className="docs-expanded">
-                    <div className="docs-expanded-divider" />
 
-                    <a href={r.file_url} target="_blank" rel="noreferrer" className="docs-open-file-btn">
+                    {/* Open file button — clicking this marks as opened */}
+                    <a href={r.file_url} target="_blank" rel="noreferrer"
+                      className="docs-open-file-btn"
+                      onClick={() => markOpened(r.id)}>
                       🔗 Open File in Drive
                     </a>
 
-                    {/* Full timeline */}
+                    {/* My action buttons if I'm a recipient */}
+                    {myRec && myRec.status !== 'DONE' && r.status !== 'COMPLETED' && (
+                      <div className="docs-my-actions">
+                        <div className="docs-my-actions-label">Your actions</div>
+                        <div className="docs-my-actions-row">
+                          <button className="docs-action-btn return"
+                            onClick={async () => {
+                              await supabase.from('file_route_recipients').update({
+                                status: 'DONE', completed_at: new Date().toISOString()
+                              }).eq('id', myRec.id);
+                              await supabase.from('file_route_events').insert({
+                                route_id: r.id, recipient_id: myRec.id,
+                                actor_id: userId, action: 'RETURNED',
+                              });
+                              await supabase.from('notifications').insert({
+                                user_id: r.creator?.id || r.created_by,
+                                type: 'FILE_RETURNED',
+                                title: `File returned: ${r.file_name}`,
+                                body: 'A recipient has finished reviewing your file.',
+                                link: '/staff/documents', read: false,
+                              });
+                              await fetchRoutes(userId);
+                            }}>
+                            ↩ Mark as Done
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Timeline */}
                     <div className="docs-timeline-label">Activity Timeline</div>
                     <div className="docs-timeline">
                       {events.length === 0 && (
-                        <div className="docs-timeline-empty">No activity recorded yet.</div>
+                        <div className="docs-timeline-empty">No activity yet.</div>
                       )}
                       {events.map((ev: any, i: number) => {
                         const isLast = i === events.length - 1;
                         const actionMeta: Record<string, { icon: string; color: string; label: string }> = {
-                          CREATED:   { icon: '✦', color: 'var(--gold)',  label: 'Created & routed' },
-                          OPENED:    { icon: '👁', color: '#64dcb4',     label: 'Opened file' },
-                          FORWARDED: { icon: '→',  color: '#a78bfa',     label: 'Forwarded to' },
-                          RETURNED:  { icon: '←',  color: '#64c864',     label: 'Returned to originator' },
+                          CREATED:   { icon: '✦', color: 'var(--gold)',   label: 'Created & routed' },
+                          OPENED:    { icon: '👁', color: '#64dcb4',      label: 'Opened file' },
+                          FORWARDED: { icon: '→',  color: '#a78bfa',      label: 'Forwarded to' },
+                          RETURNED:  { icon: '←',  color: '#64c864',      label: 'Marked as done' },
                           COMMENTED: { icon: '💬', color: 'var(--text2)', label: 'Left a comment' },
-                          COMPLETED: { icon: '★',  color: '#64c864',     label: 'Marked complete' },
-                          RECALLED:  { icon: '✗',  color: '#e05c5c',     label: 'Recalled' },
+                          COMPLETED: { icon: '★',  color: '#64c864',      label: 'Marked complete' },
+                          RECALLED:  { icon: '✗',  color: '#e05c5c',      label: 'Recalled' },
                         };
                         const meta = actionMeta[ev.action] || { icon: '·', color: 'var(--text3)', label: ev.action };
-
                         return (
                           <div key={ev.id} className="docs-timeline-entry">
                             <div className="docs-tl-left">
@@ -339,8 +374,8 @@ export default function DocumentsPage() {
                       })}
                     </div>
 
-                    {/* Recipient detail table */}
-                    <div className="docs-timeline-label" style={{ marginTop: 16 }}>Recipients</div>
+                    {/* Recipients detail */}
+                    <div className="docs-timeline-label" style={{ marginTop: 20 }}>All Recipients</div>
                     <div className="docs-recipients-table">
                       {recipients.map((rc: any) => (
                         <div key={rc.id} className="docs-recipient-row">
