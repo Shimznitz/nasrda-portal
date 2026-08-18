@@ -183,3 +183,39 @@
 }
 
 .signout-btn:hover { border-color: var(--gold); color: var(--gold); }
+
+/* ── Mobile Responsive Styles ─────────────────── */
+@media (max-width: 768px) {
+  .sidebar {
+    width: 100%;
+    min-width: 100%;
+    height: auto;
+    min-height: auto;
+    position: relative;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .nav-section {
+    max-height: 250px; /* Optional: cap height if navigation list is long */
+  }
+
+  .sidebar-footer {
+    box-sizing: border-box;
+    padding: 12px;
+    flex-wrap: wrap; /* Allows items to stack if the screen is very narrow */
+    gap: 8px;
+  }
+
+  .user-info {
+    flex: 1;
+    min-width: 140px; /* Prevents user detail text from clipping */
+  }
+
+  .signout-btn {
+    flex-shrink: 0;
+    padding: 8px 12px;
+    font-size: 0.78rem;
+    white-space: nowrap;
+  }
+}

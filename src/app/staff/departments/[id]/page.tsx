@@ -50,6 +50,7 @@ export default function DepartmentDetailedView() {
         const { data, error: projectError } = await supabase
           .from('projects')
           .select('*')
+          .eq('dept_scope_id', id)
           .order('created_at', { ascending: false })
           .limit(15);
 

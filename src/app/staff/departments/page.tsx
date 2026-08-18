@@ -14,6 +14,38 @@ export default function ManageDepartments() {
   const [editingDept, setEditingDept] = useState<any>(null);
   const [editFormData, setEditFormData] = useState({ name: '', description: '', location: '' });
 
+  // Delete States
+  const [deleting, setDeleting] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+
+  const closeEditModal = () => {
+    setEditingDept(null);
+    setSelectedHead(null);
+    setConfirmDelete(false);
+    setError('');
+  };
+
+  const handleDelete = async () => {
+    if (!editingDept) return;
+    setDeleting(true);
+    setError('');
+
+    const { error: deleteError } = await supabase
+      .from('departments')
+      .delete()
+      .eq('id', editingDept.id);
+
+    if (deleteError) {
+      setError(deleteError.message);
+      setDeleting(false);
+      return;
+    }
+
+    closeEditModal();
+    fetchDepartments();
+    setDeleting(false);
+  };
+
   // Staff search states
   const [headSearch, setHeadSearch] = useState('');
   const [searchResults, setSearchResults] = useState<any[]>([]);
@@ -111,6 +143,8 @@ export default function ManageDepartments() {
   const openEditModal = (e: React.MouseEvent, dept: any) => {
     e.stopPropagation();
     setEditingDept(dept);
+    setConfirmDelete(false);
+    setError('');
     setEditFormData({ 
       name: dept.name, 
       description: dept.description || '', 
@@ -151,8 +185,7 @@ export default function ManageDepartments() {
       if (roleError) console.error("Role update failed:", roleError);
     }
 
-    setEditingDept(null);
-    setSelectedHead(null);
+    closeEditModal();
     fetchDepartments();
     setSubmitting(false);
   };
@@ -259,39 +292,73 @@ export default function ManageDepartments() {
 
       {/* Pop-up Quick Edit Update Layer Backdrop */}
       {editingDept && (
-        <div className="modal-overlay" onClick={() => setEditingDept(null)}>
+        <div className="modal-overlay" onClick={closeEditModal}>
           <div className="modal-window" onClick={(e) => e.stopPropagation()}>
             <h3>Modify Department Information</h3>
             <form onSubmit={handleUpdate} className="modal-form">
               <div className="form-group">
                 <label>Department Name</label>
-                <input type="text" className="input-field" value={editFormData.name} onChange={(e) => setEditFormData({...editFormData, name: e.target.value})} required />
+                <input
+                  type="text"
+                  className="input-field"
+                  value={editFormData.name}
+                  onChange={(e) => setEditFormData({ ...editFormData, name: e.target.value })}
+                  required
+                />
               </div>
               <div className="form-group">
                 <label>Location</label>
-                <input type="text" className="input-field" value={editFormData.location} onChange={(e) => setEditFormData({...editFormData, location: e.target.value})} />
+                <input
+                  type="text"
+                  className="input-field"
+                  value={editFormData.location}
+                  onChange={(e) => setEditFormData({ ...editFormData, location: e.target.value })}
+                />
               </div>
               <div className="form-group">
                 <label>Description</label>
-                <textarea className="input-field" rows={3} value={editFormData.description} onChange={(e) => setEditFormData({...editFormData, description: e.target.value})} />
+                <textarea
+                  className="input-field"
+                  rows={3}
+                  value={editFormData.description}
+                  onChange={(e) => setEditFormData({ ...editFormData, description: e.target.value })}
+                />
               </div>
               <div className="form-group">
                 <label>Change Leadership Head</label>
                 {selectedHead ? (
                   <div className="selected-head">
                     <div className="selected-head-info">
-                      <div className="selected-avatar">{selectedHead.name.slice(0,2).toUpperCase()}</div>
+                      <div className="selected-avatar">
+                        {selectedHead.name.slice(0, 2).toUpperCase()}
+                      </div>
                       <div className="selected-name">{selectedHead.name}</div>
                     </div>
-                    <button type="button" className="remove-head-btn" onClick={() => setSelectedHead(null)}>✕ Remove</button>
+                    <button
+                      type="button"
+                      className="remove-head-btn"
+                      onClick={() => setSelectedHead(null)}
+                    >
+                      ✕ Remove
+                    </button>
                   </div>
                 ) : (
                   <div className="search-wrapper">
-                    <input type="text" className="input-field" placeholder="Look up personnel..." value={headSearch} onChange={(e) => setHeadSearch(e.target.value)} />
+                    <input
+                      type="text"
+                      className="input-field"
+                      placeholder="Look up personnel..."
+                      value={headSearch}
+                      onChange={(e) => setHeadSearch(e.target.value)}
+                    />
                     {headSearch.length >= 2 && (
                       <div className="search-results">
-                        {searchResults.map(staff => (
-                          <div key={staff.id} className="search-item" onClick={() => handleSelectHead(staff)}>
+                        {searchResults.map((staff) => (
+                          <div
+                            key={staff.id}
+                            className="search-item"
+                            onClick={() => handleSelectHead(staff)}
+                          >
                             <div className="search-name">{staff.name}</div>
                           </div>
                         ))}
@@ -300,14 +367,53 @@ export default function ManageDepartments() {
                   </div>
                 )}
               </div>
-              <div className="modal-actions">
-                <button type="button" className="cancel-btn" onClick={() => setEditingDept(null)}>Discard</button>
-                <button type="submit" className="btn">Save Changes</button>
+
+              {error && <p className="error">{error}</p>}
+
+              <div className="modal-actions-container">
+                {!confirmDelete ? (
+                  <button
+                    type="button"
+                    className="danger-btn-outline"
+                    onClick={() => setConfirmDelete(true)}
+                  >
+                    Delete Department
+                  </button>
+                ) : (
+                  <div className="delete-confirm-box">
+                    <span>Are you sure?</span>
+                    <button
+                      type="button"
+                      className="danger-btn-solid"
+                      onClick={handleDelete}
+                      disabled={deleting}
+                    >
+                      {deleting ? 'Deleting...' : 'Yes, Delete'}
+                    </button>
+                    <button
+                      type="button"
+                      className="cancel-sm-btn"
+                      onClick={() => setConfirmDelete(false)}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                )}
+
+                <div className="modal-actions-right">
+                  <button type="button" className="cancel-btn" onClick={closeEditModal}>
+                    Discard
+                  </button>
+                  <button type="submit" className="btn" disabled={submitting}>
+                    Save Changes
+                  </button>
+                </div>
               </div>
             </form>
           </div>
         </div>
       )}
+      
     </div>
   );
 }
