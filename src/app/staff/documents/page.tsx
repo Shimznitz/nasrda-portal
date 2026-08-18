@@ -30,71 +30,109 @@ export default function DocumentsPage() {
   }, []);
 
   const fetchRoutes = async (uid: string) => {
-    setLoading(true);
+  setLoading(true);
 
-    const selectStr = `
-      id, file_name, file_url, status, created_at, task_id,
-      creator:profiles!created_by(id, name, designation),
-      file_route_recipients(
-        id, profile_id, status, opened_at, completed_at, added_by,
-        profile:profiles(name, designation)
-      ),
-      file_route_events(
-        id, action, note, created_at, forwarded_to,
-        actor:profiles!actor_id(name, designation),
-        forwarded_to_profile:profiles!forwarded_to(name)
-      )
-    `;
+  const selectStr = `
+  id, file_name, file_url, status, created_at, task_id, created_by,
+  creator:profiles!created_by(id, name, designation),
+  file_route_recipients(
+    id, profile_id, status, opened_at, completed_at, added_by,
+    profile:profiles!profile_id(name, designation)
+  ),
+  file_route_events(
+    id, action, note, created_at, forwarded_to,
+    actor:profiles!actor_id(name, designation),
+    forwarded_to_profile:profiles!forwarded_to(name)
+  )
+`;
 
-    const { data: created } = await supabase
-      .from('file_routes').select(selectStr)
-      .eq('created_by', uid).order('created_at', { ascending: false });
+  // 1. Fetch ALL routes created by the user
+  const { data: created, error: createdErr } = await supabase
+    .from('file_routes')
+    .select(selectStr)
+    .eq('created_by', uid)
+    .order('created_at', { ascending: false });
 
-    const { data: recipRows } = await supabase
-      .from('file_route_recipients').select('route_id').eq('profile_id', uid);
+  if (createdErr) console.error('Error fetching created routes:', createdErr);
 
-    const receivedIds = (recipRows || []).map((r: any) => r.route_id);
-    let received: any[] = [];
+  // 2. Fetch recipient entries for this user
+  const { data: recipRows, error: recipErr } = await supabase
+    .from('file_route_recipients')
+    .select('route_id')
+    .eq('profile_id', uid);
 
-    if (receivedIds.length > 0) {
-      const { data: receivedData } = await supabase
-        .from('file_routes').select(selectStr)
-        .in('id', receivedIds).neq('created_by', uid)
-        .order('created_at', { ascending: false });
-      received = receivedData || [];
-    }
+  if (recipErr) console.error('Error fetching recipient rows:', recipErr);
 
-    const seen = new Set<string>();
-    const allRoutes = [
-      ...(created || []).map(r => ({ ...r, _role: 'created' })),
-      ...received.map(r => ({ ...r, _role: 'received' })),
-    ].filter(r => { if (seen.has(r.id)) return false; seen.add(r.id); return true; });
+  const receivedIds = (recipRows || []).map((r: any) => r.route_id);
+  let received: any[] = [];
 
-    // Enrich task info
-    const taskIds = [...new Set(allRoutes.filter(r => r.task_id).map(r => r.task_id))];
-    let taskMap: Record<string, any> = {};
-    if (taskIds.length > 0) {
-      const { data: tasks } = await supabase
-        .from('tasks').select('id, title, project_id').in('id', taskIds);
-      const projectIds = [...new Set((tasks || []).filter(t => t.project_id).map(t => t.project_id))];
-      let projectMap: Record<string, string> = {};
-      if (projectIds.length > 0) {
-        const { data: projects } = await supabase
-          .from('projects').select('id, title').in('id', projectIds);
-        (projects || []).forEach((p: any) => { projectMap[p.id] = p.title; });
-      }
-      (tasks || []).forEach((t: any) => {
-        taskMap[t.id] = { title: t.title, project_title: projectIds.includes(t.project_id) ? projectMap[t.project_id] : null };
+  // 3. Fetch all received routes without filtering out created_by
+  if (receivedIds.length > 0) {
+    const { data: receivedData, error: receivedErr } = await supabase
+      .from('file_routes')
+      .select(selectStr)
+      .in('id', receivedIds)
+      .order('created_at', { ascending: false });
+
+    if (receivedErr) console.error('Error fetching received routes:', receivedErr);
+    received = receivedData || [];
+  }
+
+  // 4. Merge and assign roles
+  const createdMap = new Set((created || []).map((r: any) => r.id));
+  const seen = new Set<string>();
+
+  const allRoutes = [
+    ...(created || []).map((r: any) => ({ ...r, _role: 'created' })),
+    ...received.map((r: any) => ({
+      ...r,
+      _role: createdMap.has(r.id) ? 'created' : 'received',
+    })),
+  ].filter((r: any) => {
+    if (seen.has(r.id)) return false;
+    seen.add(r.id);
+    return true;
+  });
+
+  // 5. Enrich task & project details
+  const taskIds = [...new Set(allRoutes.filter((r: any) => r.task_id).map((r: any) => r.task_id))];
+  let taskMap: Record<string, any> = {};
+
+  if (taskIds.length > 0) {
+    const { data: tasks } = await supabase
+      .from('tasks')
+      .select('id, title, project_id')
+      .in('id', taskIds);
+
+    const projectIds = [...new Set((tasks || []).filter((t: any) => t.project_id).map((t: any) => t.project_id))];
+    let projectMap: Record<string, string> = {};
+
+    if (projectIds.length > 0) {
+      const { data: projects } = await supabase
+        .from('projects')
+        .select('id, title')
+        .in('id', projectIds);
+
+      (projects || []).forEach((p: any) => {
+        projectMap[p.id] = p.title;
       });
     }
 
-    const enriched = allRoutes
-      .map(r => ({ ...r, task: r.task_id ? taskMap[r.task_id] : null }))
-      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    (tasks || []).forEach((t: any) => {
+      taskMap[t.id] = {
+        title: t.title,
+        project_title: projectIds.includes(t.project_id) ? projectMap[t.project_id] : null,
+      };
+    });
+  }
 
-    setRoutes(enriched);
-    setLoading(false);
-  };
+  const enriched = allRoutes
+    .map((r: any) => ({ ...r, task: r.task_id ? taskMap[r.task_id] : null }))
+    .sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+  setRoutes(enriched);
+  setLoading(false);
+};
 
   // Mark as opened when user clicks open file
   const markOpened = async (routeId: string) => {
