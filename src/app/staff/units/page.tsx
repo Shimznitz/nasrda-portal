@@ -1,5 +1,7 @@
 /* src/app/staff/units/page.tsx */
 
+/* src/app/staff/units/page.tsx */
+
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -109,6 +111,7 @@ export default function ManageUnits() {
         head:profiles!units_head_id_fkey(id, name, designation),
         division:divisions(name)
       `)
+      .order('division_id', { ascending: true, nullsFirst: false })
       .order('name', { ascending: true });
 
     if (divisionId) query = query.eq('division_id', divisionId);
@@ -304,6 +307,14 @@ export default function ManageUnits() {
     </div>
   );
 
+  // Group units by division
+  const unitsByDivision = units.reduce((acc: Record<string, any[]>, u: any) => {
+    const key = u.division?.name || 'No Division';
+    if (!acc[key]) acc[key] = [];
+    acc[key].push(u);
+    return acc;
+  }, {});
+
   return (
     <div className="un-page">
       <div className="un-page-header">
@@ -321,49 +332,54 @@ export default function ManageUnits() {
           <p>No units found in your scope. Create one to get started.</p>
         </div>
       ) : (
-        <div className="un-grid">
-          {units.map((unit) => (
-            <div
-              key={unit.id}
-              className="un-card"
-              onClick={() => router.push(`/staff/units/${unit.id}`)}
-            >
-              <div className="un-card-top">
-                <div className="un-card-name">{unit.name}</div>
-                <button
-                  className="un-manage-btn"
-                  onClick={(e) => { e.stopPropagation(); openManage(unit); }}
+        Object.entries(unitsByDivision).map(([divName, divUnits]) => (
+          <div key={divName} className="un-division-group">
+            <div className="un-division-group-label">{divName}</div>
+            <div className="un-grid">
+              {(divUnits as any[]).map((unit) => (
+                <div
+                  key={unit.id}
+                  className="un-card"
+                  onClick={() => router.push(`/staff/units/${unit.id}`)}
                 >
-                  Manage
-                </button>
-              </div>
-
-              {unit.description && (
-                <p className="un-card-desc">{unit.description}</p>
-              )}
-
-              <div className="un-card-meta">
-                <div className="un-meta-item">
-                  <span className="un-meta-label">Head</span>
-                  <span className="un-meta-value">
-                    {unit.head?.name || <span className="un-vacant">Vacant</span>}
-                  </span>
-                </div>
-                {unit.division?.name && (
-                  <div className="un-meta-item">
-                    <span className="un-meta-label">Division</span>
-                    <span className="un-meta-value">{unit.division.name}</span>
+                  <div className="un-card-top">
+                    <div className="un-card-name">{unit.name}</div>
+                    <button
+                      className="un-manage-btn"
+                      onClick={(e) => { e.stopPropagation(); openManage(unit); }}
+                    >
+                      Manage
+                    </button>
                   </div>
-                )}
-              </div>
 
-              <div className="un-card-chips">
-                <span className="un-chip">{unit.memberCount} staff</span>
-                <span className="un-chip gold">{unit.openTaskCount} open tasks</span>
-              </div>
+                  {unit.description && (
+                    <p className="un-card-desc">{unit.description}</p>
+                  )}
+
+                  <div className="un-card-meta">
+                    <div className="un-meta-item">
+                      <span className="un-meta-label">Head</span>
+                      <span className="un-meta-value">
+                        {unit.head?.name || <span className="un-vacant">Vacant</span>}
+                      </span>
+                    </div>
+                    {unit.division?.name && (
+                      <div className="un-meta-item">
+                        <span className="un-meta-label">Division</span>
+                        <span className="un-meta-value">{unit.division.name}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="un-card-chips">
+                    <span className="un-chip">{unit.memberCount} staff</span>
+                    <span className="un-chip gold">{unit.openTaskCount} open tasks</span>
+                  </div>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
+          </div>
+        ))
       )}
 
       {/* ── CREATE MODAL ── */}

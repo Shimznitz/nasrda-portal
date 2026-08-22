@@ -5,6 +5,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
+import Avatar from "@/components/Avatar";
 import "./divisions.css";
 
 const initials = (name: string) =>
@@ -35,7 +36,7 @@ function SearchDropdown({ headSearch, setHeadSearch, searching, searchResults, o
           )}
           {searchResults.map((s: any) => (
             <div key={s.id} className="div-search-item" onClick={() => onSelect(s)}>
-              <div className="div-avatar sm">{initials(s.name)}</div>
+              <Avatar avatarUrl={s.avatar_url} name={s.name} size="sm" />
               <div className="div-search-info">
                 <div className="div-search-name">{s.name}</div>
                 <div className="div-search-role">
@@ -56,7 +57,7 @@ function SearchDropdown({ headSearch, setHeadSearch, searching, searchResults, o
 function SelectedHead({ head, onRemove }: { head: any; onRemove: () => void }) {
   return (
     <div className="div-selected-head">
-      <div className="div-avatar sm">{initials(head.name)}</div>
+      <Avatar avatarUrl={head.avatar_url} name={head.name} size="sm" />
       <div className="div-selected-info">
         <div className="div-selected-name">{head.name}</div>
         <div className="div-selected-role">{head.designation || 'Staff Member'}</div>
@@ -94,53 +95,53 @@ export default function ManageDivisions() {
   useEffect(() => { loadPage(); }, []);
 
   const loadPage = async () => {
-  setLoading(true);
-  try {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
+    setLoading(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
 
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('id, role, department_id')
-      .eq('id', user.id)
-      .single();
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('id, role, department_id')
+        .eq('id', user.id)
+        .single();
 
-    if (!profile) return;
+      if (!profile) return;
 
-    let dept: any = null;
+      let dept: any = null;
 
-    // 1. Check if user is explicitly listed as head_id in departments
-    const { data: headedDept } = await supabase
-      .from('departments')
-      .select('*')
-      .eq('head_id', user.id)
-      .maybeSingle();
-
-    if (headedDept) {
-      dept = headedDept;
-    } else if (profile.department_id) {
-      // 2. Fallback: check the user's assigned department_id
-      const { data: assignedDept } = await supabase
+      // 1. Check if user is explicitly listed as head_id in departments
+      const { data: headedDept } = await supabase
         .from('departments')
         .select('*')
-        .eq('id', profile.department_id)
+        .eq('head_id', user.id)
         .maybeSingle();
-      dept = assignedDept;
+
+      if (headedDept) {
+        dept = headedDept;
+      } else if (profile.department_id) {
+        // 2. Fallback: check the user's assigned department_id
+        const { data: assignedDept } = await supabase
+          .from('departments')
+          .select('*')
+          .eq('id', profile.department_id)
+          .maybeSingle();
+        dept = assignedDept;
+      }
+
+      if (!dept) return;
+
+      setMyDept(dept);
+      await loadDivisions(dept.id);
+    } finally {
+      setLoading(false);
     }
-
-    if (!dept) return;
-
-    setMyDept(dept);
-    await loadDivisions(dept.id);
-  } finally {
-    setLoading(false);
-  }
-};
+  };
 
   const loadDivisions = async (deptId: string) => {
     const { data: divs } = await supabase
       .from('divisions')
-      .select(`id, name, code, description, head:profiles!divisions_head_id_fkey(id, name, designation)`)
+      .select(`id, name, code, description, head:profiles!divisions_head_id_fkey(id, name, designation, avatar_url)`)
       .eq('department_id', deptId)
       .order('name');
 
@@ -165,7 +166,7 @@ export default function ManageDivisions() {
       setSearching(true);
       const { data } = await supabase
         .from('profiles')
-        .select('id, name, designation, division_id, divisions:divisions!profiles_division_id_fkey(name)')
+        .select('id, name, designation, avatar_url, division_id, divisions:divisions!profiles_division_id_fkey(name)')
         .ilike('name', `%${headSearch}%`)
         .eq('department_id', myDept.id)
         .limit(10);
@@ -190,31 +191,31 @@ export default function ManageDivisions() {
   };
 
   const handleCreate = async () => {
-  if (!myDept) { setError('Department context missing. Please refresh.'); return; }
-  if (!newName.trim()) { setError('Division name is required.'); return; }
-  
-  setSubmitting(true); setError('');
+    if (!myDept) { setError('Department context missing. Please refresh.'); return; }
+    if (!newName.trim()) { setError('Division name is required.'); return; }
 
-  const { data: division, error: err } = await supabase.from('divisions').insert({
-    name: newName.trim(),
-    code: newCode.trim() || null,
-    description: newDescription.trim() || null,
-    department_id: myDept.id,
-    head_id: selectedHead?.id || null,
-  }).select().single();
+    setSubmitting(true); setError('');
 
-  if (err || !division) { setError(err?.message || 'Failed to create.'); setSubmitting(false); return; }
+    const { data: division, error: err } = await supabase.from('divisions').insert({
+      name: newName.trim(),
+      code: newCode.trim() || null,
+      description: newDescription.trim() || null,
+      department_id: myDept.id,
+      head_id: selectedHead?.id || null,
+    }).select().single();
 
-  if (selectedHead?.id) {
-    await supabase.from('profiles').update({
-      role: 'DIVISION_HEAD', division_id: division.id, department_id: myDept.id,
-    }).eq('id', selectedHead.id);
-  }
+    if (err || !division) { setError(err?.message || 'Failed to create.'); setSubmitting(false); return; }
 
-  resetForm(); setShowCreateModal(false);
-  await loadDivisions(myDept.id);
-  setSubmitting(false);
-};
+    if (selectedHead?.id) {
+      await supabase.from('profiles').update({
+        role: 'DIVISION_HEAD', division_id: division.id, department_id: myDept.id,
+      }).eq('id', selectedHead.id);
+    }
+
+    resetForm(); setShowCreateModal(false);
+    await loadDivisions(myDept.id);
+    setSubmitting(false);
+  };
 
   const handleUpdate = async () => {
     if (!selectedDivision || !editName.trim()) { setError('Name is required.'); return; }

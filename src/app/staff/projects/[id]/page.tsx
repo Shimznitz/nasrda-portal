@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useParams, useRouter } from "next/navigation";
 import "./project-detail.css";
+import Avatar from '@/components/Avatar';
 
 const initials = (name: string) =>
   name?.split(' ').map((n) => n[0]).slice(0, 2).join('').toUpperCase() || '??';
@@ -57,6 +58,7 @@ export default function ProjectDetail() {
   const [isCreator, setIsCreator]   = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [loading, setLoading]       = useState(true);
+  const [parentProjectTitle, setParentProjectTitle] = useState('');
 
   const [modal, setModal] = useState<
     'none' | 'createTask' | 'submitWork' | 'review' | 'editProject' | 'fileRoute' | 'routeDetail' | 'taskLog'
@@ -85,7 +87,7 @@ export default function ProjectDetail() {
 
       const { data: memberRows } = await supabase
         .from('project_members')
-        .select('profile_id, is_lead, profiles(id, name, designation)')
+        .select('profile_id, is_lead, profiles(id, name, designation, avatar_url)')
         .eq('project_id', id);
       setMembers(memberRows || []);
 
@@ -158,6 +160,12 @@ export default function ProjectDetail() {
               {project.status?.replace(/_/g, ' ') || 'ACTIVE'}
             </span>
           </div>
+          {project.parent_project_id && (
+  <div className="pd-parent-link"
+    onClick={() => router.push(`/staff/projects/${project.parent_project_id}`)}>
+    ↑ Part of: <span>{parentProjectTitle}</span>
+  </div>
+)}
         </div>
         <div className="pd-header-right">
           <div className="pd-progress-ring-wrap">
@@ -188,7 +196,7 @@ export default function ProjectDetail() {
         <div className="pd-members-strip">
           {members.map((m: any) => (
             <div key={m.profile_id} className="pd-member-chip">
-              <div className="pd-member-avatar">{initials(m.profiles?.name || '')}</div>
+              <Avatar name={m.profiles?.name} avatarUrl={m.profiles?.avatar_url} size="sm" />
               <div className="pd-member-info">
                 <div className="pd-member-name">{m.profiles?.name}</div>
                 {m.is_lead && <div className="pd-member-lead">Lead</div>}
@@ -234,7 +242,7 @@ export default function ProjectDetail() {
                       <div className="pd-task-meta">
                         {task.assignee?.name && (
                           <span className="pd-task-assignee">
-                            <div className="pd-mini-avatar">{initials(task.assignee.name)}</div>
+                            <Avatar name={task.assignee?.name} avatarUrl={task.assignee?.avatar_url} size="xs" />
                             {task.assignee.name}
                           </span>
                         )}
@@ -755,7 +763,7 @@ function TaskLogModal({ task, onClose }: any) {
 }
 
 // ── FILE ROUTE MODAL ──────────────────────────────────────────
-function FileRouteModal({ task, currentUser, onClose, onSuccess, projectLink }: any) {
+function FileRouteModal({ task, currentUser, projectLink, onSuccess, onClose }: any) {
   const [fileName, setFileName] = useState('');
   const [fileUrl, setFileUrl] = useState('');
   const [note, setNote] = useState('');
@@ -765,6 +773,7 @@ function FileRouteModal({ task, currentUser, onClose, onSuccess, projectLink }: 
   const [searching, setSearching] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [routeSuccess, setRouteSuccess] = useState(false);
 
   useEffect(() => {
     const search = async () => {
@@ -851,10 +860,16 @@ function FileRouteModal({ task, currentUser, onClose, onSuccess, projectLink }: 
       await notify(r.id, 'FILE_ROUTED',
         `File routed to you: ${fileName}`,
         `${currentUser.name} sent you a file to review: "${task.title}"`,
-        projectLink);
+        '/staff/documents');
     }
 
-    onSuccess(); onClose();
+    setRouteSuccess(true);
+    onSuccess();
+
+    // Don't close immediately — show success state
+    setTimeout(() => {
+      onClose();
+    }, 2000);
   };
 
   return (
@@ -905,7 +920,7 @@ function FileRouteModal({ task, currentUser, onClose, onSuccess, projectLink }: 
                 return (
                   <div key={s.id} className={`pd-search-item ${selected ? 'selected' : ''}`}
                     onClick={() => toggleRecipient(s)}>
-                    <div className="pd-mini-avatar">{initials(s.name)}</div>
+                    <Avatar name={s.name} avatarUrl={s.avatar_url} size="xs" />
                     <div className="pd-search-info">
                       <div className="pd-search-name">{s.name}</div>
                       <div className="pd-search-role">
@@ -930,12 +945,19 @@ function FileRouteModal({ task, currentUser, onClose, onSuccess, projectLink }: 
             <div className="pd-selected-recipients">
               {selectedRecipients.map((r: any) => (
                 <div key={r.id} className="pd-selected-recipient-pill">
-                  <div className="pd-mini-avatar">{initials(r.name)}</div>
+                  <Avatar name={r.name} avatarUrl={r.avatar_url} size="xs" />
                   <span>{r.name}</span>
                   <button onClick={() => toggleRecipient(r)}>✕</button>
                 </div>
               ))}
             </div>
+          </div>
+        )}
+
+        {routeSuccess && (
+          <div className="pd-route-success">
+            ✓ File routed to {selectedRecipients.length} person{selectedRecipients.length !== 1 ? 's' : ''} successfully.
+            Closing in 2s…
           </div>
         )}
 
@@ -970,10 +992,10 @@ function RouteDetailModal({ route, task, currentUser, onClose, onSuccess, projec
     const [{ data: r }, { data: ev }] = await Promise.all([
       supabase.from('file_routes').select(`
         *,
-        creator:profiles!created_by(id, name, designation),
+        creator:profiles!created_by(id, name, designation, avatar_url),
         file_route_recipients(
           id, profile_id, status, opened_at, completed_at,
-          profile:profiles(id, name, designation),
+          profile:profiles(id, name, designation, avatar_url),
           adder:profiles!added_by(name)
         )
       `).eq('id', route.id).single(),
@@ -1182,7 +1204,7 @@ function RouteDetailModal({ route, task, currentUser, onClose, onSuccess, projec
           <div className="fr-section-label">Chain of Custody</div>
           <div className="fr-recipients">
             <div className="fr-recipient-row creator">
-              <div className="pd-mini-avatar">{initials(fullRoute?.creator?.name || '')}</div>
+              <Avatar name={fullRoute?.creator?.name} avatarUrl={fullRoute?.creator?.avatar_url} size="sm" />
               <div className="fr-recipient-info">
                 <div className="fr-recipient-name">
                   {fullRoute?.creator?.name}
@@ -1195,7 +1217,7 @@ function RouteDetailModal({ route, task, currentUser, onClose, onSuccess, projec
 
             {fullRoute?.file_route_recipients?.map((rc: any) => (
               <div key={rc.id} className="fr-recipient-row">
-                <div className="pd-mini-avatar">{initials(rc.profile?.name || '')}</div>
+                <Avatar name={rc.profile?.name} avatarUrl={rc.profile?.avatar_url} size="sm" />
                 <div className="fr-recipient-info">
                   <div className="fr-recipient-name">{rc.profile?.name}</div>
                   <div className="fr-recipient-role">
@@ -1458,7 +1480,7 @@ function EditProjectModal({ project, members, currentUser, onClose, onSuccess, o
           <div className="pd-member-edit-list">
             {currentMembers.map((m: any) => (
               <div key={m.profile_id} className="pd-member-edit-row">
-                <div className="pd-mini-avatar">{initials(m.profiles?.name || '')}</div>
+                <Avatar name={m.profiles?.name} avatarUrl={m.profiles?.avatar_url} size="sm" />
                 <div className="pd-member-edit-info">
                   <div className="pd-member-name">{m.profiles?.name}</div>
                   <div className="pd-search-role">{m.profiles?.designation}</div>

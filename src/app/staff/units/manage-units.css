@@ -430,6 +430,20 @@ select.un-input { cursor: pointer; }
 
 .un-confirm-delete span { font-size: 0.82rem; color: #e05c5c; }
 
+.un-division-group { margin-bottom: 28px; }
+
+.un-division-group-label {
+  font-size: 0.68rem;
+  color: var(--text3);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-family: 'IBM Plex Mono', monospace;
+  font-weight: 600;
+  margin-bottom: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+}
+
 /* ── Responsive ───────────────────────────────── */
 @media (max-width: 768px) {
   .un-page { padding: 24px 16px; }

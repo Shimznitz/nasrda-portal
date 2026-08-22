@@ -200,6 +200,123 @@
   color: var(--text3);
 }
 
+/* ── Card variants ────────────────────────────── */
+.sd-grid-detail {
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+}
+
+.sd-card-detail {
+  align-items: flex-start;
+  text-align: left;
+}
+
+/* ── Card top ─────────────────────────────────── */
+.sd-card-top {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  width: 100%;
+  margin-bottom: 10px;
+}
+
+.sd-avatar-img {
+  width: 48px; height: 48px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid var(--gold);
+  flex-shrink: 0;
+}
+
+.sd-card-name-block { flex: 1; min-width: 0; }
+.sd-card-name { font-size: 0.95rem; font-weight: 600; color: var(--text); }
+.sd-card-desig { font-size: 0.78rem; color: var(--text2); margin: 2px 0; }
+.sd-card-email { font-size: 0.68rem; color: var(--text3); font-family: 'IBM Plex Mono', monospace; word-break: break-all; }
+
+/* ── Extra detail (privileged) ────────────────── */
+.sd-card-extra {
+  width: 100%;
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+  margin-top: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sd-extra-row {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.sd-extra-label {
+  font-size: 0.62rem;
+  color: var(--text3);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-family: 'IBM Plex Mono', monospace;
+  flex-shrink: 0;
+  min-width: 80px;
+  padding-top: 2px;
+}
+
+.sd-extra-value {
+  font-size: 0.82rem;
+  color: var(--text2);
+  flex: 1;
+}
+
+.sd-bio {
+  font-style: italic;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.sd-extra-skills { align-items: flex-start; }
+
+.sd-skills-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  flex: 1;
+}
+
+.sd-skill-chip {
+  font-size: 0.62rem;
+  background: rgba(100,220,180,0.08);
+  border: 1px solid rgba(100,220,180,0.2);
+  color: #64dcb4;
+  padding: 1px 7px;
+  border-radius: 9999px;
+  font-family: 'IBM Plex Mono', monospace;
+}
+
+.sd-wa-link {
+  font-size: 0.78rem;
+  color: #25d366;
+  text-decoration: none;
+}
+
+.sd-wa-link:hover { text-decoration: underline; }
+
+/* ── Card meta ────────────────────────────────── */
+.sd-card-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  width: 100%;
+  padding-bottom: 8px;
+}
+
+.sd-meta-line {
+  font-size: 0.72rem;
+  color: var(--text3);
+  font-family: 'IBM Plex Mono', monospace;
+}
+
 /* ── Responsive ───────────────────────────────── */
 @media (max-width: 600px) {
   .sd-page { padding: 24px 16px; }

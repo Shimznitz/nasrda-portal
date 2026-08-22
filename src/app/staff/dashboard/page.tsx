@@ -780,33 +780,72 @@ function UnitHeadDashboard({ profile }: { profile: any }) {
 function StaffDashboard({ profile }: { profile: any }) {
   const [projects, setProjects] = useState<any[]>([]);
   const [tasks, setTasks] = useState<any[]>([]);
+  const [orgContext, setOrgContext] = useState<any>({});
   const [stats, setStats] = useState({ totalProjects: 0, openTasks: 0, completedTasks: 0 });
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
   useEffect(() => {
     const load = async () => {
-      const { data: memberships } = await supabase
-        .from('project_members')
-        .select('project_id')
-        .eq('profile_id', profile.id);
+      // Fetch org context based on role
+      const ctx: any = {};
 
+      // Everyone gets their department
+      if (profile.department_id) {
+        const { data: dept } = await supabase
+          .from('departments').select('id, name, head:profiles!head_id(name)')
+          .eq('id', profile.department_id).maybeSingle();
+        if (dept) ctx.department = dept;
+      }
+
+      // Division heads and below get division
+      // But division heads don't belong to a unit
+      if (profile.division_id && profile.role !== 'DEPT_ADMIN') {
+        const { data: div } = await supabase
+          .from('divisions').select('id, name, head:profiles!divisions_head_id_fkey(name)')
+          .eq('id', profile.division_id).maybeSingle();
+        if (div) ctx.division = div;
+      }
+
+      // Unit heads and regular staff get their unit
+      // But unit heads don't belong to a sub-unit
+      if (profile.unit_id && profile.role !== 'DEPT_ADMIN' && profile.role !== 'DIVISION_HEAD') {
+        const { data: unit } = await supabase
+          .from('units').select('id, name, head:profiles!units_head_id_fkey(name)')
+          .eq('id', profile.unit_id).maybeSingle();
+        if (unit) ctx.unit = unit;
+      }
+
+      setOrgContext(ctx);
+
+      // Projects via membership
+      const { data: memberships } = await supabase
+        .from('project_members').select('project_id').eq('profile_id', profile.id);
       const ids = memberships?.map((m: any) => m.project_id) ?? [];
 
       if (ids.length > 0) {
-        const [{ data: projs }, { data: openTasks }, { count: completedCount }] = await Promise.all([
-          supabase.from('projects').select('id, title, status, progress, due_date').in('id', ids).order('created_at', { ascending: false }).limit(5),
-          supabase.from('tasks').select('id, title, status, due_date, projects(title)').in('project_id', ids).eq('assigned_to', profile.id).neq('status', 'COMPLETED').order('due_date', { ascending: true }).limit(8),
-          supabase.from('tasks').select('id', { count: 'exact', head: true }).in('project_id', ids).eq('assigned_to', profile.id).eq('status', 'COMPLETED'),
-        ]);
-        setProjects(projs || []);
-        setTasks(openTasks || []);
-        setStats({ totalProjects: ids.length, openTasks: openTasks?.length ?? 0, completedTasks: completedCount ?? 0 });
-      } else {
-        setProjects([]);
-        setTasks([]);
-        setStats({ totalProjects: 0, openTasks: 0, completedTasks: 0 });
+        const { data: projs } = await supabase
+          .from('projects').select('id, title, status, progress, due_date')
+          .in('id', ids).order('created_at', { ascending: false }).limit(5);
+        setProjects(projs ?? []);
+
+        const { data: openTasks } = await supabase
+          .from('tasks').select('id, title, status, due_date, projects(title)')
+          .in('project_id', ids).eq('assigned_to', profile.id)
+          .neq('status', 'COMPLETED').order('due_date', { ascending: true }).limit(6);
+        setTasks(openTasks ?? []);
+
+        const { count: completedCount } = await supabase
+          .from('tasks').select('id', { count: 'exact', head: true })
+          .in('project_id', ids).eq('assigned_to', profile.id).eq('status', 'COMPLETED');
+
+        setStats({
+          totalProjects: ids.length,
+          openTasks: openTasks?.length ?? 0,
+          completedTasks: completedCount ?? 0,
+        });
       }
+
       setLoading(false);
     };
     load();
@@ -820,7 +859,25 @@ function StaffDashboard({ profile }: { profile: any }) {
         <div className="db-header-left">
           <p className="db-eyebrow">{getGreeting()}</p>
           <h1 className="db-title">{profile.name?.split(' ')[0]}<span className="db-title-dot">.</span></h1>
-          <p className="db-subtitle">{profile.designation || 'Staff Member'}</p>
+          <p className="db-subtitle">{profile.designation || formatRole(profile.role)}</p>
+        {/* Org breadcrumb */}
+          <div className="db-org-breadcrumb">
+            {orgContext.department && (
+              <span className="db-org-chip dept">
+                🏛 {orgContext.department.name}
+              </span>
+            )}
+            {orgContext.division && (
+              <span className="db-org-chip div">
+                ▧ {orgContext.division.name}
+              </span>
+            )}
+            {orgContext.unit && (
+              <span className="db-org-chip unit">
+                ▨ {orgContext.unit.name}
+              </span>
+            )}
+          </div>
         </div>
         <div className="db-role-badge">{formatRole(profile.role)}</div>
       </div>

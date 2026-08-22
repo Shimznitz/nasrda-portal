@@ -7,6 +7,7 @@ import { supabase } from "@/lib/supabase";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import Image from "next/image";
+import Avatar from "@/components/Avatar";
 import "./Sidebar.css";
 
 interface NavItem {
@@ -130,14 +131,14 @@ export default function Sidebar() {
 
       case 'DIVISION_HEAD':
         return [
-          dashboard, units,
+          dashboard, units, triage,
           divProjects, tasks, activity,
           documents, directory, messages, notifications, profileLink,
         ];
 
       case 'UNIT_HEAD':
         return [
-          dashboard,
+          dashboard, triage,
           unitProjects, tasks, activity,
           documents, directory, messages, notifications, profileLink,
         ];
@@ -189,8 +190,8 @@ export default function Sidebar() {
             className="official-logo" priority />
         </div>
         <div>
-          <div className="logo-title">NASRDA</div>
-          <div className="logo-subtitle">STAFF PORTAL</div>
+          <div className="logo-title">ESS</div>
+          <div className="logo-subtitle">ECO-SYSTEM</div>
         </div>
       </div>
 
@@ -218,7 +219,7 @@ export default function Sidebar() {
 
       <div className="sidebar-footer">
         <div className="user-info">
-          <div className="user-avatar">{avatarInitials}</div>
+          <Avatar name={profile?.name} avatarUrl={profile?.avatar_url} size="sm" />
           <div className="user-details">
             <div className="user-name">{name}</div>
             <div className="user-staffno">

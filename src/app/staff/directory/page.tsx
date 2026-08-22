@@ -29,62 +29,99 @@ export default function StaffTriagePage() {
 
       const { data: prof } = await supabase
         .from('profiles')
-        .select('id, role, department_id, division_id')
+        .select('id, role, department_id, division_id, unit_id')
         .eq('id', user.id)
         .single();
 
       if (!prof) return;
       setProfile(prof);
 
+      // 1. DIRECTOR GENERAL / SUPER ADMIN
+      // Sees all created Departments, Divisions, and Units across the organization
       if (prof.role === 'DG' || prof.role === 'SUPER_ADMIN') {
-        // DG sees all staff and all departments
-        const [{ data: allStaff }, { data: depts }] = await Promise.all([
+        const [{ data: allStaff }, { data: depts }, { data: divs }, { data: unitRows }] = await Promise.all([
           supabase.from('profiles')
-            .select('id, name, email, designation, role, department_id, division_id, unit_id, departments:departments!profiles_department_id_fkey(name)')
+            .select('id, name, email, designation, role, department_id, division_id, unit_id, departments:departments!profiles_department_id_fkey(name), divisions:divisions!profiles_division_id_fkey(name), units:units!profiles_unit_id_fkey(name)')
             .neq('id', prof.id)
             .order('name'),
           supabase.from('departments').select('id, name').order('name'),
+          supabase.from('divisions').select('id, name, department_id').order('name'),
+          supabase.from('units').select('id, name, division_id, department_id').order('name'),
         ]);
         setStaff(allStaff || []);
         setDepartments(depts || []);
-
-      } else if (prof.role === 'DEPT_ADMIN') {
-        // Director sees staff in their department + divisions + units
-        const { data: dept } = await supabase
-          .from('departments').select('id, name').eq('head_id', user.id).single();
-
-        if (!dept) return;
-
-        const [{ data: deptStaff }, { data: divs }, { data: unitRows }] = await Promise.all([
-          supabase.from('profiles')
-            .select('id, name, email, designation, role, department_id, division_id, unit_id, divisions:divisions!profiles_division_id_fkey(name), units:units!profiles_unit_id_fkey(name)')
-            .eq('department_id', dept.id)
-            .neq('id', prof.id)
-            .order('name'),
-          supabase.from('divisions').select('id, name').eq('department_id', dept.id).order('name'),
-          supabase.from('units').select('id, name, division_id').eq('department_id', dept.id).order('name'),
-        ]);
-        setStaff(deptStaff || []);
         setDivisions(divs || []);
         setUnits(unitRows || []);
 
-      } else if (prof.role === 'DIVISION_HEAD') {
-        // Division head sees staff in their division + units
-        const { data: div } = await supabase
-          .from('divisions').select('id, name').eq('head_id', user.id).single();
+      // 2. DEPARTMENT DIRECTOR (DEPT_ADMIN)
+      // Only sees Divisions created under their specific Department
+      } else if (prof.role === 'DEPT_ADMIN') {
+        const { data: dept } = await supabase
+          .from('departments').select('id, name').eq('head_id', user.id).single();
 
-        if (!div) return;
+        const activeDeptId = dept?.id || prof.department_id;
+        if (!activeDeptId) return;
 
-        const [{ data: divStaff }, { data: unitRows }] = await Promise.all([
+        const [{ data: deptStaff }, { data: depts }, { data: divs }, { data: unitRows }] = await Promise.all([
           supabase.from('profiles')
-            .select('id, name, email, designation, role, division_id, unit_id, units:units!profiles_unit_id_fkey(name)')
-            .eq('division_id', div.id)
+            .select('id, name, email, designation, role, department_id, division_id, unit_id, departments:departments!profiles_department_id_fkey(name), divisions:divisions!profiles_division_id_fkey(name), units:units!profiles_unit_id_fkey(name)')
             .neq('id', prof.id)
             .order('name'),
-          supabase.from('units').select('id, name').eq('division_id', div.id).order('name'),
+          supabase.from('departments').select('id, name').order('name'),
+          // Only fetch divisions explicitly created under this department
+          supabase.from('divisions').select('id, name, department_id').eq('department_id', activeDeptId).order('name'),
+          // Only fetch units under this department's created divisions
+          supabase.from('units').select('id, name, division_id, department_id').eq('department_id', activeDeptId).order('name'),
         ]);
-        setStaff(divStaff || []);
+
+        setStaff(deptStaff || []);
+        setDepartments(depts || []);
+        setDivisions(divs || []);
         setUnits(unitRows || []);
+
+      // 3. DIVISION HEAD
+      // Only sees Units created under their specific Division
+      } else if (prof.role === 'DIVISION_HEAD') {
+        const { data: div } = await supabase
+          .from('divisions').select('id, name, department_id').eq('head_id', user.id).single();
+
+        const activeDivId = div?.id || prof.division_id;
+        const activeDeptId = div?.department_id || prof.department_id;
+
+        if (!activeDivId) return;
+
+        const [{ data: scopedStaff }, { data: unitRows }] = await Promise.all([
+          supabase.from('profiles')
+            .select('id, name, email, designation, role, department_id, division_id, unit_id, departments:departments!profiles_department_id_fkey(name), divisions:divisions!profiles_division_id_fkey(name), units:units!profiles_unit_id_fkey(name)')
+            .eq('department_id', activeDeptId)
+            .neq('id', prof.id)
+            .order('name'),
+          // Only fetch units explicitly created under this specific division
+          supabase.from('units').select('id, name, division_id, department_id').eq('division_id', activeDivId).order('name'),
+        ]);
+
+        setStaff(scopedStaff || []);
+        setDivisions(div ? [div] : []);
+        setUnits(unitRows || []);
+
+      // 4. UNIT HEAD
+      // Only manages staff within their created Unit
+      } else if (prof.role === 'UNIT_HEAD') {
+        const { data: unit } = await supabase
+          .from('units').select('id, name, division_id, department_id').eq('head_id', user.id).single();
+
+        const activeDivId = unit?.division_id || prof.division_id;
+        if (!activeDivId) return;
+
+        const { data: scopedStaff } = await supabase
+          .from('profiles')
+          .select('id, name, email, designation, role, department_id, division_id, unit_id, departments:departments!profiles_department_id_fkey(name), divisions:divisions!profiles_division_id_fkey(name), units:units!profiles_unit_id_fkey(name)')
+          .eq('division_id', activeDivId)
+          .neq('id', prof.id)
+          .order('name');
+
+        setStaff(scopedStaff || []);
+        setUnits(unit ? [unit] : []);
       }
     } finally {
       setLoading(false);
@@ -93,14 +130,19 @@ export default function StaffTriagePage() {
 
   const assignDepartment = async (staffId: string, deptId: string) => {
     setSaving(staffId);
-    const { error } = await supabase
-      .from('profiles')
-      .update({ department_id: deptId || null, division_id: null, unit_id: null })
-      .eq('id', staffId);
+    const dept = departments.find(d => d.id === deptId);
+    const updates = { department_id: deptId || null, division_id: null, unit_id: null };
+
+    const { error } = await supabase.from('profiles').update(updates).eq('id', staffId);
+
     if (!error) {
-      setStaff(prev => prev.map(s =>
-        s.id === staffId ? { ...s, department_id: deptId || null, division_id: null, unit_id: null } : s
-      ));
+      setStaff(prev => prev.map(s => s.id === staffId ? {
+        ...s,
+        ...updates,
+        departments: dept ? { name: dept.name } : null,
+        divisions: null,
+        units: null
+      } : s));
     }
     setSaving(null);
   };
@@ -108,14 +150,17 @@ export default function StaffTriagePage() {
   const assignDivision = async (staffId: string, divId: string) => {
     setSaving(staffId);
     const div = divisions.find(d => d.id === divId);
-    const { error } = await supabase
-      .from('profiles')
-      .update({ division_id: divId || null, unit_id: null })
-      .eq('id', staffId);
+    const updates = { division_id: divId || null, unit_id: null };
+
+    const { error } = await supabase.from('profiles').update(updates).eq('id', staffId);
+
     if (!error) {
-      setStaff(prev => prev.map(s =>
-        s.id === staffId ? { ...s, division_id: divId || null, unit_id: null, divisions: div ? { name: div.name } : null } : s
-      ));
+      setStaff(prev => prev.map(s => s.id === staffId ? {
+        ...s,
+        ...updates,
+        divisions: div ? { name: div.name } : null,
+        units: null
+      } : s));
     }
     setSaving(null);
   };
@@ -123,14 +168,16 @@ export default function StaffTriagePage() {
   const assignUnit = async (staffId: string, unitId: string) => {
     setSaving(staffId);
     const unit = units.find(u => u.id === unitId);
-    const { error } = await supabase
-      .from('profiles')
-      .update({ unit_id: unitId || null })
-      .eq('id', staffId);
+    const updates = { unit_id: unitId || null };
+
+    const { error } = await supabase.from('profiles').update(updates).eq('id', staffId);
+
     if (!error) {
-      setStaff(prev => prev.map(s =>
-        s.id === staffId ? { ...s, unit_id: unitId || null, units: unit ? { name: unit.name } : null } : s
-      ));
+      setStaff(prev => prev.map(s => s.id === staffId ? {
+        ...s,
+        ...updates,
+        units: unit ? { name: unit.name } : null
+      } : s));
     }
     setSaving(null);
   };
@@ -138,26 +185,28 @@ export default function StaffTriagePage() {
   const isDG = profile?.role === 'DG' || profile?.role === 'SUPER_ADMIN';
   const isDeptAdmin = profile?.role === 'DEPT_ADMIN';
   const isDivHead = profile?.role === 'DIVISION_HEAD';
+  const isUnitHead = profile?.role === 'UNIT_HEAD';
 
   const filtered = staff.filter(s => {
     const matchSearch = !search || s.name?.toLowerCase().includes(search.toLowerCase()) ||
       s.email?.toLowerCase().includes(search.toLowerCase());
     const matchScope = filterScope === 'all' || (
-      isDG ? !s.department_id :
-      isDeptAdmin ? !s.division_id :
-      isDivHead ? !s.unit_id : true
+      isDG || isDeptAdmin ? !s.department_id :
+      isDivHead ? !s.division_id :
+      isUnitHead ? !s.unit_id : true
     );
     return matchSearch && matchScope;
   });
 
-  const scopeLabel = isDG ? 'Organisation-wide triage'
-    : isDeptAdmin ? 'Department triage'
-    : isDivHead ? 'Division triage' : 'Triage';
+  const scopeLabel = isDG ? 'Organisation-wide Triage'
+    : isDeptAdmin ? 'Department Triage'
+    : isDivHead ? 'Division Triage'
+    : isUnitHead ? 'Unit Triage' : 'Triage';
 
   const unassignedCount = staff.filter(s =>
-    isDG ? !s.department_id :
-    isDeptAdmin ? !s.division_id :
-    isDivHead ? !s.unit_id : false
+    isDG || isDeptAdmin ? !s.department_id :
+    isDivHead ? !s.division_id :
+    isUnitHead ? !s.unit_id : false
   ).length;
 
   if (loading) return (
@@ -186,7 +235,6 @@ export default function StaffTriagePage() {
         </div>
       </div>
 
-      {/* Controls */}
       <div className="triage-controls">
         <input
           className="triage-search"
@@ -218,14 +266,8 @@ export default function StaffTriagePage() {
         <div className="triage-list">
           {filtered.map((s) => {
             const isSaving = saving === s.id;
-            const staffDivisions = isDeptAdmin
-              ? divisions
-              : isDivHead
-              ? divisions
-              : [];
-            const staffUnits = s.division_id
-              ? units.filter(u => u.division_id === s.division_id || !u.division_id)
-              : units;
+            const availableDivisions = divisions.filter((d: any) => d.department_id === s.department_id);
+            const availableUnits = units.filter((u: any) => u.division_id === s.division_id);
 
             return (
               <div key={s.id} className={`triage-row ${isSaving ? 'saving' : ''}`}>
@@ -239,8 +281,8 @@ export default function StaffTriagePage() {
                 </div>
 
                 <div className="triage-row-right">
-                  {/* DG: assign to department */}
-                  {isDG && (
+                  {/* DEPARTMENT SELECTOR: Only if created departments exist */}
+                  {(isDG || isDeptAdmin) && departments.length > 0 && (
                     <div className="triage-assign-group">
                       <label>Department</label>
                       <select
@@ -257,8 +299,8 @@ export default function StaffTriagePage() {
                     </div>
                   )}
 
-                  {/* DEPT_ADMIN: assign to division */}
-                  {isDeptAdmin && (
+                  {/* DIVISION SELECTOR: Only if created divisions exist under this department */}
+                  {(isDeptAdmin || isDivHead) && s.department_id && availableDivisions.length > 0 && (
                     <div className="triage-assign-group">
                       <label>Division</label>
                       <select
@@ -268,15 +310,15 @@ export default function StaffTriagePage() {
                         disabled={isSaving}
                       >
                         <option value="">— Unassigned —</option>
-                        {divisions.map((d: any) => (
+                        {availableDivisions.map((d: any) => (
                           <option key={d.id} value={d.id}>{d.name}</option>
                         ))}
                       </select>
                     </div>
                   )}
 
-                  {/* DEPT_ADMIN: also assign to unit if division chosen */}
-                  {isDeptAdmin && s.division_id && (
+                  {/* UNIT SELECTOR: Only if created units exist under this division */}
+                  {(isDivHead || isUnitHead || isDeptAdmin) && s.division_id && availableUnits.length > 0 && (
                     <div className="triage-assign-group">
                       <label>Unit</label>
                       <select
@@ -286,34 +328,13 @@ export default function StaffTriagePage() {
                         disabled={isSaving}
                       >
                         <option value="">— Unassigned —</option>
-                        {units
-                          .filter((u: any) => !u.division_id || u.division_id === s.division_id)
-                          .map((u: any) => (
-                            <option key={u.id} value={u.id}>{u.name}</option>
-                          ))}
-                      </select>
-                    </div>
-                  )}
-
-                  {/* DIVISION_HEAD: assign to unit */}
-                  {isDivHead && (
-                    <div className="triage-assign-group">
-                      <label>Unit</label>
-                      <select
-                        className="triage-select"
-                        value={s.unit_id || ''}
-                        onChange={(e) => assignUnit(s.id, e.target.value)}
-                        disabled={isSaving}
-                      >
-                        <option value="">— Unassigned —</option>
-                        {units.map((u: any) => (
+                        {availableUnits.map((u: any) => (
                           <option key={u.id} value={u.id}>{u.name}</option>
                         ))}
                       </select>
                     </div>
                   )}
 
-                  {/* Current location chips */}
                   <div className="triage-chips">
                     {s.departments?.name && (
                       <span className="triage-chip">{s.departments.name}</span>

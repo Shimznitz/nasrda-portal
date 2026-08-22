@@ -86,13 +86,13 @@ export default function AuthPage() {
               <Image src="/nasrdalogo.png" alt="NASRDA Logo" width={90} height={90} className="login-logo" />
             </div>
             <div className="brand-text">
-              <div className="brand-name">NASRDA</div>
-              <div className="brand-sub">National Space Research and Development Agency</div>
+              <div className="brand-name">ESS, NASRDA</div>
+              <div className="brand-sub">Engineering and Space Systems, National Space Research and Development Agency</div>
             </div>
           </div>
           <div className="auth-tagline">
             <h1>Nigeria's Gateway to Space</h1>
-            <p>Staff Portal — Manage projects, teams and deliverables across all centres and labs nationwide.</p>
+            <p>Manage projects, teams and deliverables across all centres and labs nationwide.</p>
           </div>
         </div>
 

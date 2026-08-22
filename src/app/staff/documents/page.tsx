@@ -4,6 +4,8 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import './documents.css';
+import Avatar from '@/components/Avatar';
+import { useSearchParams } from 'next/navigation';
 
 const initials = (name: string) =>
   name?.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase() || '??';
@@ -18,6 +20,8 @@ export default function DocumentsPage() {
   const [loading, setLoading]   = useState(true);
   const [filter, setFilter]     = useState<'all' | 'created' | 'received'>('all');
   const [expanded, setExpanded] = useState<string | null>(null);
+  const searchParams = useSearchParams();
+  const highlightRouteId = searchParams.get('route')
 
   useEffect(() => {
     const load = async () => {
@@ -34,10 +38,10 @@ export default function DocumentsPage() {
 
   const selectStr = `
   id, file_name, file_url, status, created_at, task_id, created_by,
-  creator:profiles!created_by(id, name, designation),
+  creator:profiles!created_by(id, name, designation, avatar_url),
   file_route_recipients(
     id, profile_id, status, opened_at, completed_at, added_by,
-    profile:profiles!profile_id(name, designation)
+    profile:profiles!profile_id(name, designation, avatar_url)
   ),
   file_route_events(
     id, action, note, created_at, forwarded_to,
@@ -131,6 +135,9 @@ export default function DocumentsPage() {
     .sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
   setRoutes(enriched);
+  if (highlightRouteId) {
+  setExpanded(highlightRouteId);
+}
   setLoading(false);
 };
 
@@ -267,7 +274,7 @@ export default function DocumentsPage() {
 
                     {/* Originator */}
                     <div className="docs-node originator">
-                      <div className="docs-node-avatar gold">{initials(r.creator?.name || '')}</div>
+                      <Avatar name={r.creator?.name} avatarUrl={r.creator?.avatar_url} size="sm" />
                       <div className="docs-node-label">{r.creator?.name?.split(' ')[0]}</div>
                       <div className="docs-node-sublabel">Originator</div>
                     </div>

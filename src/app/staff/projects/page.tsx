@@ -1,5 +1,7 @@
 // src/app/staff/projects/page.tsx
 
+// src/app/staff/projects/page.tsx
+
 'use client';
 
 import { useEffect, useState } from "react";
@@ -169,9 +171,29 @@ function CreateProjectModal({ onClose, onSuccess, profile }: any) {
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [teamMembers, setTeamMembers] = useState<any[]>([]);
   const [leadId, setLeadId] = useState<string | null>(null);
+  
+  // State for Sub-project linking
+  const [parentProjectId, setParentProjectId] = useState('');
+  const [availableParents, setAvailableParents] = useState<any[]>([]);
+
   const [searching, setSearching] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+
+  // Load potential parent projects on mount
+  useEffect(() => {
+    const loadParents = async () => {
+      if (!profile?.id) return;
+      const { data } = await supabase
+        .from('projects')
+        .select('id, title')
+        .eq('created_by', profile.id)
+        .order('created_at', { ascending: false })
+        .limit(20);
+      setAvailableParents(data || []);
+    };
+    loadParents();
+  }, [profile?.id]);
 
   useEffect(() => {
     const search = async () => {
@@ -185,7 +207,7 @@ function CreateProjectModal({ onClose, onSuccess, profile }: any) {
         .neq('id', profile.id)
         .limit(10);
 
-      if (profile.centre_id)     query = query.eq('centre_id', profile.centre_id);
+      if (profile.centre_id)         query = query.eq('centre_id', profile.centre_id);
       else if (profile.division_id)   query = query.eq('division_id', profile.division_id);
       else if (profile.department_id) query = query.eq('department_id', profile.department_id);
       else if (profile.unit_id)       query = query.eq('unit_id', profile.unit_id);
@@ -230,6 +252,7 @@ function CreateProjectModal({ onClose, onSuccess, profile }: any) {
         dept_scope_id: profile.department_id || null,
         div_scope_id: profile.division_id || null,
         unit_scope_id: profile.unit_id || null,
+        parent_project_id: parentProjectId || null,
         progress: 0,
         status: 'ACTIVE',
       })
@@ -354,6 +377,25 @@ function CreateProjectModal({ onClose, onSuccess, profile }: any) {
                 </div>
               ))}
             </div>
+          </div>
+        )}
+
+        {/* Parent Project Selector */}
+        {availableParents.length > 0 && (
+          <div className="form-group">
+            <label>Link to Parent Project (optional)</label>
+            <select
+              className="input-field"
+              value={parentProjectId}
+              onChange={(e) => setParentProjectId(e.target.value)}
+            >
+              <option value="">None — standalone project</option>
+              {availableParents.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.title}
+                </option>
+              ))}
+            </select>
           </div>
         )}
 

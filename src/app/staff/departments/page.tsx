@@ -1,7 +1,9 @@
+//src/app/staff/departments/page.tsx
 'use client';
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import Avatar from '@/components/Avatar';
 import "./departments.css";
 
 export default function ManageDepartments() {
@@ -60,7 +62,7 @@ export default function ManageDepartments() {
       .from('departments')
       .select(`
         *,
-        profiles:head_id ( id, name, designation, staff_no )
+        profiles:head_id ( id, name, designation, staff_no, avatar_url)
       `)
       .order('created_at', { ascending: false });
     
@@ -82,7 +84,7 @@ export default function ManageDepartments() {
       setSearching(true);
       const { data } = await supabase
         .from('profiles')
-        .select('id, name, designation, staff_no, role')
+        .select('id, name, designation, staff_no, role, avatar_url')
         .ilike('name', `%${headSearch}%`)
         .limit(10);
       setSearchResults(data || []);
@@ -240,7 +242,7 @@ export default function ManageDepartments() {
               {selectedHead ? (
                 <div className="selected-head">
                   <div className="selected-head-info">
-                    <div className="selected-avatar">{selectedHead.name.slice(0,2).toUpperCase()}</div>
+                    <Avatar name={selectedHead.name} avatarUrl={selectedHead.avatar_url} size="md" />
                     <div><div className="selected-name">{selectedHead.name}</div></div>
                   </div>
                   <button type="button" className="remove-head-btn" onClick={() => setSelectedHead(null)}>✕ Remove</button>
@@ -253,7 +255,7 @@ export default function ManageDepartments() {
                       {searching && <div className="search-item muted">Searching...</div>}
                       {searchResults.map(staff => (
                         <div key={staff.id} className="search-item" onClick={() => handleSelectHead(staff)}>
-                          <div className="search-avatar">{staff.name.slice(0,2).toUpperCase()}</div>
+                          <Avatar name={staff.name} avatarUrl={staff.avatar_url} size="sm" />
                           <div className="search-item-info"><div className="search-name">{staff.name}</div></div>
                         </div>
                       ))}

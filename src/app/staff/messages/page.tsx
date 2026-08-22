@@ -4,6 +4,7 @@
 
 import { useEffect, useState, useRef, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
+import Avatar from "@/components/Avatar";
 import "./messages.css";
 
 export default function MessagesPage() {
@@ -102,7 +103,7 @@ export default function MessagesPage() {
       if (search.length < 2) { setSearchResults([]); return; }
       const { data } = await supabase
         .from('profiles')
-        .select('id, name, designation')
+        .select('id, name, designation, avatar_url')
         .ilike('name', `%${search}%`)
         .neq('id', profileRef.current?.id || '')
         .limit(8);
@@ -187,7 +188,7 @@ export default function MessagesPage() {
               <div className="msg-search-results">
                 {searchResults.map((s: any) => (
                   <div key={s.id} className="msg-search-item" onClick={() => startConversation(s)}>
-                    <div className="msg-avatar">{initials(s.name)}</div>
+                    <Avatar name={s.name} avatarUrl={s.avatar_url} size="md" />
                     <div className="msg-search-info">
                       <div className="msg-search-name">{s.name}</div>
                       <div className="msg-search-role">{s.designation}</div>
@@ -215,7 +216,7 @@ export default function MessagesPage() {
                 onClick={() => startConversation(c)}
               >
                 <div className="msg-avatar-wrap">
-                  <div className="msg-avatar">{initials(c.name)}</div>
+                  <Avatar name={c.name} avatarUrl={c.avatar_url} size="md" />
                   {(unreadCounts[c.id] || 0) > 0 && (
                     <div className="msg-conv-badge">{unreadCounts[c.id]}</div>
                   )}
@@ -240,7 +241,7 @@ export default function MessagesPage() {
         ) : (
           <>
             <div className="msg-chat-header">
-              <div className="msg-avatar">{initials(activeConv.name)}</div>
+              <Avatar name={activeConv.name} avatarUrl={activeConv.avatar_url} size="md" />
               <div className="msg-chat-header-info">
                 <div className="msg-chat-name">{activeConv.name}</div>
                 <div className="msg-chat-role">{activeConv.designation}</div>

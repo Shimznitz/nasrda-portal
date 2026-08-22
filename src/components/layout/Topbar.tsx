@@ -4,6 +4,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import Link from "next/link";
+import Avatar from "@/components/Avatar";
 import "./Topbar.css";
 
 export default function Topbar() {
@@ -111,7 +112,7 @@ export default function Topbar() {
               <div className="user-role">{role}</div>
             </div>
             <Link href="/staff/profile" style={{ textDecoration: 'none' }}>
-              <div className="user-avatar">{initials}</div>
+              <Avatar name={profile?.name} avatarUrl={profile?.avatar_url} size="md" />
             </Link>
           </div>
         </div>
