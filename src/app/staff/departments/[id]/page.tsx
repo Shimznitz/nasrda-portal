@@ -7,7 +7,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { initials } from '@/lib/utils';
 import Avatar from '@/components/Avatar';
-import './department-detail.css';
+import './department-details.css';
 
 
 const STATUS_CLASS: Record<string, string> = {
