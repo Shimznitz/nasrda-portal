@@ -1,6 +1,6 @@
 // src/app/layout.tsx
+'use client';
 
-'use client'; // Required to use hooks
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import Link from "next/link";
@@ -10,14 +10,38 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
+    let isMounted = true;
+
     const checkUser = async () => {
       const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single();
-        setIsAdmin(profile?.role === 'admin');
+      if (user && isMounted) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', user.id)
+          .single();
+        if (isMounted) {
+          setIsAdmin(profile?.role === 'admin');
+        }
       }
     };
+
     checkUser();
+
+    // Listen for auth state changes cleanly
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!isMounted) return;
+      if (session?.user) {
+        checkUser();
+      } else {
+        setIsAdmin(false);
+      }
+    });
+
+    return () => {
+      isMounted = false;
+      subscription.unsubscribe(); // Cleans up orphaned listeners/locks
+    };
   }, []);
 
   return (

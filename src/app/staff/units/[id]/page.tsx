@@ -1,5 +1,7 @@
 /*src/app/staff/units/[id]/page.tsx*/
 
+/* src/app/staff/units/[id]/page.tsx */
+
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -108,7 +110,11 @@ export default function UnitDetail() {
           {data.description && <p className="ud-desc">{data.description}</p>}
           {data.head?.name && (
             <div className="ud-head-row">
-              <Avatar avatarUrl={data.head.avatar_url} name={data.head.name} size="sm" />
+              {data.head.avatar_url ? (
+                <Avatar avatarUrl={data.head.avatar_url} name={data.head.name} size="sm" />
+              ) : (
+                <div className="ud-avatar sm">{initials(data.head.name)}</div>
+              )}
               <div>
                 <div className="ud-head-name">{data.head.name}</div>
                 <div className="ud-head-role">{data.head.designation || 'Unit Head'}</div>
@@ -184,7 +190,11 @@ export default function UnitDetail() {
           <div className="ud-staff-grid">
             {data.staff.map((s: any) => (
               <div key={s.id} className="ud-staff-card">
-                <Avatar avatarUrl={s.avatar_url} name={s.name} size="md" />
+                {s.avatar_url ? (
+                  <Avatar avatarUrl={s.avatar_url} name={s.name} size="md" />
+                ) : (
+                  <div className="ud-avatar md">{initials(s.name)}</div>
+                )}
                 <div className="ud-staff-info">
                   <div className="ud-staff-name">{s.name}</div>
                   <div className="ud-staff-role">{s.designation || '—'}</div>
@@ -235,7 +245,7 @@ function OrgDrivesPanel({ entityType, entityId, currentUser }: any) {
     <div className="ud-panel ud-panel-full" style={{ marginTop: 20 }}>
       <div className="ud-panel-header">
         <span className="ud-panel-title">🗂 Org Drives</span>
-        <button className="div-btn-gold" style={{ fontSize: '0.78rem', padding: '5px 12px' }}
+        <button className="ud-btn-gold" style={{ fontSize: '0.78rem', padding: '5px 12px' }}
           onClick={() => setShowAdd(!showAdd)}>
           {showAdd ? 'Cancel' : '+ Add Drive'}
         </button>
@@ -243,13 +253,13 @@ function OrgDrivesPanel({ entityType, entityId, currentUser }: any) {
 
       {showAdd && (
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 12 }}>
-          <input className="div-input" style={{ flex: 1, minWidth: 140 }}
+          <input className="ud-input" style={{ flex: 1, minWidth: 140 }}
             placeholder="Drive name (e.g. Unit Resources)"
             value={name} onChange={e => setName(e.target.value)} />
-          <input className="div-input" style={{ flex: 2, minWidth: 200 }}
+          <input className="ud-input" style={{ flex: 2, minWidth: 200 }}
             placeholder="https://drive.google.com/…"
             value={url} onChange={e => setUrl(e.target.value)} />
-          <button className="div-btn-gold" onClick={add} disabled={saving}>
+          <button className="ud-btn-gold" onClick={add} disabled={saving}>
             {saving ? 'Adding…' : 'Add'}
           </button>
         </div>

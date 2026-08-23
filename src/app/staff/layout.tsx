@@ -21,11 +21,14 @@ export default async function StaffLayout({
           return cookieStore.getAll();
         },
         setAll(cookiesToSet) {
-          // This allows the server to set cookies back to the browser
-          cookiesToSet.forEach(({ name, value, options }) =>
-            cookieStore.set(name, value, options)
-          );
-        },
+  try {
+    cookiesToSet.forEach(({ name, value, options }) =>
+      cookieStore.set(name, value, options)
+    );
+  } catch {
+    // Called from Server Component - middleware handles session updates
+  }
+},
       },
     }
   );

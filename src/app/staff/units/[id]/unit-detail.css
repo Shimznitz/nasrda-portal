@@ -380,6 +380,44 @@
 
 .ud-avatar.sm { width: 28px; height: 28px; font-size: 0.62rem; }
 
+.ud-avatar.md {
+  width: 40px;
+  height: 40px;
+  font-size: 0.95rem;
+}
+
+/* Input & Button Styles */
+.ud-input {
+  background: var(--bg2, #1e202e);
+  border: 1px solid var(--border, #33364d);
+  color: var(--text, #ffffff);
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-size: 0.85rem;
+  outline: none;
+}
+.ud-input:focus {
+  border-color: var(--gold, #d97706);
+}
+
+.ud-btn-gold {
+  background: var(--gold, #d97706);
+  color: #ffffff;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.2s ease;
+}
+.ud-btn-gold:hover {
+  opacity: 0.9;
+}
+.ud-btn-gold:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 /* ── Empty ────────────────────────────────────── */
 .ud-empty {
   color: var(--text3);

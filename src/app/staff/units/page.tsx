@@ -1,7 +1,4 @@
 /* src/app/staff/units/page.tsx */
-
-/* src/app/staff/units/page.tsx */
-
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -9,6 +6,69 @@ import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { initials } from '@/lib/utils';
 import './manage-units.css';
+
+const SearchDropdown = ({
+  headSearch,
+  setHeadSearch,
+  searching,
+  searchResults,
+  onSelect,
+}: {
+  headSearch: string;
+  setHeadSearch: (val: string) => void;
+  searching: boolean;
+  searchResults: any[];
+  onSelect: (s: any) => void;
+}) => (
+  <>
+    <input
+      className="un-input"
+      placeholder="Search by name…"
+      value={headSearch}
+      onChange={(e) => setHeadSearch(e.target.value)}
+      autoComplete="off"
+    />
+    {headSearch.length >= 2 && (
+      <div className="un-search-drop">
+        {searching && <div className="un-search-empty">Searching…</div>}
+        {!searching && searchResults.length === 0 && (
+          <div className="un-search-empty">No staff found.</div>
+        )}
+        {searchResults.map((s: any) => (
+          <div key={s.id} className="un-search-item" onClick={() => onSelect(s)}>
+            <div className="un-avatar sm">{initials(s.name)}</div>
+            <div className="un-search-info">
+              <div className="un-search-name">{s.name}</div>
+              <div className="un-search-role">
+                {s.designation || '—'}
+                {/* Visual indicator if user is already a Unit Head */}
+                {s.role === 'UNIT_HEAD' && (
+                  <span className="un-search-assigned" style={{ color: '#d97706', fontWeight: 600 }}>
+                    {' '}· Currently Unit Head ({s.units?.name || 'Assigned'})
+                  </span>
+                )}
+                {s.role !== 'UNIT_HEAD' && s.unit_id && s.units?.name && (
+                  <span className="un-search-assigned"> · {s.units.name}</span>
+                )}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    )}
+  </>
+);
+
+const SelectedHead = ({ head, onRemove }: { head: any; onRemove: () => void }) => (
+  <div className="un-selected-head">
+    <div className="un-avatar sm">{initials(head.name)}</div>
+    <div className="un-selected-info">
+      <div className="un-selected-name">{head.name}</div>
+      <div className="un-selected-role">{head.designation || 'Staff Member'}</div>
+    </div>
+    <button className="un-remove-btn" type="button" onClick={onRemove}>✕</button>
+  </div>
+);
 
 export default function ManageUnits() {
   const router = useRouter();
@@ -61,13 +121,11 @@ export default function ManageUnits() {
 
       // Determine scope and label
       if (prof.role === 'DEPT_ADMIN') {
-        // Get dept via head_id
         const { data: dept } = await supabase
           .from('departments').select('id, name').eq('head_id', user.id).single();
 
         if (dept) {
           setScopeLabel(`Department of ${dept.name}`);
-          // Get all divisions in dept for the create form
           const { data: divs } = await supabase
             .from('divisions').select('id, name').eq('department_id', dept.id).order('name');
           setDivisions(divs || []);
@@ -83,7 +141,6 @@ export default function ManageUnits() {
           await loadUnits({ divisionId: div.id });
         }
       } else {
-        // SUPER_ADMIN / DG — show all, scoped by their dept if available
         if (prof.department_id) {
           const { data: divs } = await supabase
             .from('divisions').select('id, name').eq('department_id', prof.department_id).order('name');
@@ -105,7 +162,7 @@ export default function ManageUnits() {
     let query = supabase
       .from('units')
       .select(`
-        id, name, description, division_id, department_id,
+        id, name, description, division_id, department_id, head_id,
         head:profiles!units_head_id_fkey(id, name, designation),
         division:divisions(name)
       `)
@@ -118,7 +175,6 @@ export default function ManageUnits() {
     const { data, error: err } = await query;
     if (err) { console.error(err); setUnits([]); return; }
 
-    // Get member counts
     const withCounts = await Promise.all((data || []).map(async (u: any) => {
       const { count } = await supabase
         .from('profiles').select('id', { count: 'exact', head: true }).eq('unit_id', u.id);
@@ -141,7 +197,7 @@ export default function ManageUnits() {
 
       let query = supabase
         .from('profiles')
-        .select('id, name, designation, unit_id, units:units!profiles_unit_id_fkey(name)')
+        .select('id, name, designation, role, unit_id, units:units!profiles_unit_id_fkey(name)')
         .ilike('name', `%${headSearch}%`)
         .limit(10);
 
@@ -170,7 +226,6 @@ export default function ManageUnits() {
     if (!newName.trim()) { setError('Unit name is required.'); return; }
     setSubmitting(true); setError('');
 
-    // Resolve department_id from chosen division
     const chosenDiv = divisions.find(d => d.id === newDivisionId);
     let deptId: string | null = null;
     if (newDivisionId) {
@@ -211,17 +266,30 @@ export default function ManageUnits() {
     if (!selectedUnit || !editName.trim()) { setError('Name is required.'); return; }
     setSubmitting(true); setError('');
 
+    const oldHeadId = selectedUnit.head_id || selectedUnit.head?.id;
+    const newHeadId = selectedHead?.id || null;
+
+    // 1. Demote previous head if head changed or was removed
+    if (oldHeadId && oldHeadId !== newHeadId) {
+      await supabase
+        .from('profiles')
+        .update({ role: 'STAFF', unit_id: null })
+        .eq('id', oldHeadId);
+    }
+
+    // 2. Update unit record
     const { error: err } = await supabase
       .from('units')
       .update({
         name: editName.trim(),
         description: editDescription.trim() || null,
-        head_id: selectedHead?.id || selectedUnit.head?.id || null,
+        head_id: newHeadId,
       })
       .eq('id', selectedUnit.id);
 
     if (err) { setError(err.message); setSubmitting(false); return; }
 
+    // 3. Promote new head and assign to this unit
     if (selectedHead?.id) {
       await supabase.from('profiles').update({
         role: 'UNIT_HEAD',
@@ -237,6 +305,15 @@ export default function ManageUnits() {
 
   const handleDelete = async () => {
     if (!selectedUnit) return;
+
+    // Clear unit_id and role from head before deleting unit
+    if (selectedUnit.head_id || selectedUnit.head?.id) {
+      await supabase
+        .from('profiles')
+        .update({ role: 'STAFF', unit_id: null })
+        .eq('id', selectedUnit.head_id || selectedUnit.head?.id);
+    }
+
     await supabase.from('units').delete().eq('id', selectedUnit.id);
     resetForm();
     setShowManageModal(false);
@@ -253,51 +330,6 @@ export default function ManageUnits() {
     setShowManageModal(true);
   };
 
-  const SearchDropdown = ({ onSelect }: { onSelect: (s: any) => void }) => (
-    <>
-      <input
-        className="un-input"
-        placeholder="Search by name…"
-        value={headSearch}
-        onChange={(e) => setHeadSearch(e.target.value)}
-        autoComplete="off"
-      />
-      {headSearch.length >= 2 && (
-        <div className="un-search-drop">
-          {searching && <div className="un-search-empty">Searching…</div>}
-          {!searching && searchResults.length === 0 && (
-            <div className="un-search-empty">No staff found.</div>
-          )}
-          {searchResults.map((s: any) => (
-            <div key={s.id} className="un-search-item" onClick={() => onSelect(s)}>
-              <div className="un-avatar sm">{initials(s.name)}</div>
-              <div className="un-search-info">
-                <div className="un-search-name">{s.name}</div>
-                <div className="un-search-role">
-                  {s.designation || '—'}
-                  {s.unit_id && s.units?.name && (
-                    <span className="un-search-assigned"> · {s.units.name}</span>
-                  )}
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-    </>
-  );
-
-  const SelectedHead = ({ head, onRemove }: { head: any; onRemove: () => void }) => (
-    <div className="un-selected-head">
-      <div className="un-avatar sm">{initials(head.name)}</div>
-      <div className="un-selected-info">
-        <div className="un-selected-name">{head.name}</div>
-        <div className="un-selected-role">{head.designation || 'Staff Member'}</div>
-      </div>
-      <button className="un-remove-btn" onClick={onRemove}>✕</button>
-    </div>
-  );
-
   if (loading) return (
     <div className="un-loading">
       <div className="un-loading-bar" />
@@ -305,7 +337,6 @@ export default function ManageUnits() {
     </div>
   );
 
-  // Group units by division
   const unitsByDivision = units.reduce((acc: Record<string, any[]>, u: any) => {
     const key = u.division?.name || 'No Division';
     if (!acc[key]) acc[key] = [];
@@ -421,7 +452,14 @@ export default function ManageUnits() {
               <label>Unit Head (optional)</label>
               {selectedHead
                 ? <SelectedHead head={selectedHead} onRemove={() => setSelectedHead(null)} />
-                : <SearchDropdown onSelect={(s) => { setSelectedHead(s); setHeadSearch(''); setSearchResults([]); }} />}
+                : <SearchDropdown
+                    headSearch={headSearch}
+                    setHeadSearch={setHeadSearch}
+                    searching={searching}
+                    searchResults={searchResults}
+                    onSelect={(s) => { setSelectedHead(s); setHeadSearch(''); setSearchResults([]); }}
+                  />
+              }
             </div>
 
             <div className="un-modal-actions">
@@ -461,7 +499,14 @@ export default function ManageUnits() {
               <label>Unit Head</label>
               {selectedHead
                 ? <SelectedHead head={selectedHead} onRemove={() => setSelectedHead(null)} />
-                : <SearchDropdown onSelect={(s) => { setSelectedHead(s); setHeadSearch(''); setSearchResults([]); }} />}
+                : <SearchDropdown
+                    headSearch={headSearch}
+                    setHeadSearch={setHeadSearch}
+                    searching={searching}
+                    searchResults={searchResults}
+                    onSelect={(s) => { setSelectedHead(s); setHeadSearch(''); setSearchResults([]); }}
+                  />
+              }
             </div>
 
             <div className="un-modal-actions un-modal-actions-split">
