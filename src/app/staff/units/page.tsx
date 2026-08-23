@@ -7,10 +7,8 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
+import { initials } from '@/lib/utils';
 import './manage-units.css';
-
-const initials = (name: string) =>
-  name?.split(' ').map((n) => n[0]).slice(0, 2).join('').toUpperCase() || '??';
 
 export default function ManageUnits() {
   const router = useRouter();

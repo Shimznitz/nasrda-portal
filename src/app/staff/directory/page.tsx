@@ -3,10 +3,8 @@
 
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
+import { initials } from '@/lib/utils';
 import './directory.css';
-
-const initials = (name: string) =>
-  name?.split(' ').map((n) => n[0]).slice(0, 2).join('').toUpperCase() || '??';
 
 export default function StaffTriagePage() {
   const [profile, setProfile] = useState<any>(null);
@@ -37,11 +35,10 @@ export default function StaffTriagePage() {
       setProfile(prof);
 
       // 1. DIRECTOR GENERAL / SUPER ADMIN
-      // Sees all created Departments, Divisions, and Units across the organization
       if (prof.role === 'DG' || prof.role === 'SUPER_ADMIN') {
         const [{ data: allStaff }, { data: depts }, { data: divs }, { data: unitRows }] = await Promise.all([
           supabase.from('profiles')
-            .select('id, name, email, designation, role, department_id, division_id, unit_id, departments:departments!profiles_department_id_fkey(name), divisions:divisions!profiles_division_id_fkey(name), units:units!profiles_unit_id_fkey(name)')
+            .select('id, name, email, designation, staff_no, avatar_url, role, department_id, division_id, unit_id, departments:departments!profiles_department_id_fkey(name), divisions:divisions!profiles_division_id_fkey(name), units:units!profiles_unit_id_fkey(name)')
             .neq('id', prof.id)
             .order('name'),
           supabase.from('departments').select('id, name').order('name'),
@@ -54,7 +51,6 @@ export default function StaffTriagePage() {
         setUnits(unitRows || []);
 
       // 2. DEPARTMENT DIRECTOR (DEPT_ADMIN)
-      // Only sees Divisions created under their specific Department
       } else if (prof.role === 'DEPT_ADMIN') {
         const { data: dept } = await supabase
           .from('departments').select('id, name').eq('head_id', user.id).single();
@@ -64,13 +60,11 @@ export default function StaffTriagePage() {
 
         const [{ data: deptStaff }, { data: depts }, { data: divs }, { data: unitRows }] = await Promise.all([
           supabase.from('profiles')
-            .select('id, name, email, designation, role, department_id, division_id, unit_id, departments:departments!profiles_department_id_fkey(name), divisions:divisions!profiles_division_id_fkey(name), units:units!profiles_unit_id_fkey(name)')
+            .select('id, name, email, designation, staff_no, avatar_url, role, department_id, division_id, unit_id, departments:departments!profiles_department_id_fkey(name), divisions:divisions!profiles_division_id_fkey(name), units:units!profiles_unit_id_fkey(name)')
             .neq('id', prof.id)
             .order('name'),
           supabase.from('departments').select('id, name').order('name'),
-          // Only fetch divisions explicitly created under this department
           supabase.from('divisions').select('id, name, department_id').eq('department_id', activeDeptId).order('name'),
-          // Only fetch units under this department's created divisions
           supabase.from('units').select('id, name, division_id, department_id').eq('department_id', activeDeptId).order('name'),
         ]);
 
@@ -80,7 +74,6 @@ export default function StaffTriagePage() {
         setUnits(unitRows || []);
 
       // 3. DIVISION HEAD
-      // Only sees Units created under their specific Division
       } else if (prof.role === 'DIVISION_HEAD') {
         const { data: div } = await supabase
           .from('divisions').select('id, name, department_id').eq('head_id', user.id).single();
@@ -92,11 +85,10 @@ export default function StaffTriagePage() {
 
         const [{ data: scopedStaff }, { data: unitRows }] = await Promise.all([
           supabase.from('profiles')
-            .select('id, name, email, designation, role, department_id, division_id, unit_id, departments:departments!profiles_department_id_fkey(name), divisions:divisions!profiles_division_id_fkey(name), units:units!profiles_unit_id_fkey(name)')
+            .select('id, name, email, designation, staff_no, avatar_url, role, department_id, division_id, unit_id, departments:departments!profiles_department_id_fkey(name), divisions:divisions!profiles_division_id_fkey(name), units:units!profiles_unit_id_fkey(name)')
             .eq('department_id', activeDeptId)
             .neq('id', prof.id)
             .order('name'),
-          // Only fetch units explicitly created under this specific division
           supabase.from('units').select('id, name, division_id, department_id').eq('division_id', activeDivId).order('name'),
         ]);
 
@@ -105,7 +97,6 @@ export default function StaffTriagePage() {
         setUnits(unitRows || []);
 
       // 4. UNIT HEAD
-      // Only manages staff within their created Unit
       } else if (prof.role === 'UNIT_HEAD') {
         const { data: unit } = await supabase
           .from('units').select('id, name, division_id, department_id').eq('head_id', user.id).single();
@@ -115,7 +106,7 @@ export default function StaffTriagePage() {
 
         const { data: scopedStaff } = await supabase
           .from('profiles')
-          .select('id, name, email, designation, role, department_id, division_id, unit_id, departments:departments!profiles_department_id_fkey(name), divisions:divisions!profiles_division_id_fkey(name), units:units!profiles_unit_id_fkey(name)')
+          .select('id, name, email, designation, staff_no, avatar_url, role, department_id, division_id, unit_id, departments:departments!profiles_department_id_fkey(name), divisions:divisions!profiles_division_id_fkey(name), units:units!profiles_unit_id_fkey(name)')
           .eq('division_id', activeDivId)
           .neq('id', prof.id)
           .order('name');
@@ -188,15 +179,21 @@ export default function StaffTriagePage() {
   const isUnitHead = profile?.role === 'UNIT_HEAD';
 
   const filtered = staff.filter(s => {
-    const matchSearch = !search || s.name?.toLowerCase().includes(search.toLowerCase()) ||
-      s.email?.toLowerCase().includes(search.toLowerCase());
-    const matchScope = filterScope === 'all' || (
-      isDG || isDeptAdmin ? !s.department_id :
-      isDivHead ? !s.division_id :
-      isUnitHead ? !s.unit_id : true
-    );
-    return matchSearch && matchScope;
-  });
+  const query = search.trim().toLowerCase();
+  
+  const matchSearch = !query || 
+    s.name?.toLowerCase().includes(query) ||
+    s.email?.toLowerCase().includes(query) ||
+    s.staff_no?.toLowerCase().includes(query);
+
+  const matchScope = filterScope === 'all' || (
+    isDG || isDeptAdmin ? !s.department_id :
+    isDivHead ? !s.division_id :
+    isUnitHead ? !s.unit_id : true
+  );
+  
+  return matchSearch && matchScope;
+});
 
   const scopeLabel = isDG ? 'Organisation-wide Triage'
     : isDeptAdmin ? 'Department Triage'
@@ -238,7 +235,7 @@ export default function StaffTriagePage() {
       <div className="triage-controls">
         <input
           className="triage-search"
-          placeholder="Search by name or email…"
+          placeholder="Search by name, email, or file number…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
@@ -272,11 +269,18 @@ export default function StaffTriagePage() {
             return (
               <div key={s.id} className={`triage-row ${isSaving ? 'saving' : ''}`}>
                 <div className="triage-row-left">
-                  <div className="triage-avatar">{initials(s.name || '')}</div>
+                  {s.avatar_url ? (
+                    <img src={s.avatar_url} alt={s.name || 'Avatar'} className="triage-avatar-img" />
+                  ) : (
+                    <div className="triage-avatar">{initials(s.name)}</div>
+                  )}
                   <div className="triage-info">
                     <div className="triage-name">{s.name || 'Unnamed'}</div>
                     <div className="triage-email">{s.email}</div>
-                    {s.designation && <div className="triage-desig">{s.designation}</div>}
+                    <div className="triage-meta-row">
+                      {s.staff_no && <span className="triage-staff-no">File No: {s.staff_no}</span>}
+                      {s.designation && <span className="triage-desig">{s.designation}</span>}
+                    </div>
                   </div>
                 </div>
 

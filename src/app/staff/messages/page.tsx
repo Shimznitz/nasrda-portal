@@ -4,6 +4,7 @@
 
 import { useEffect, useState, useRef, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
+import { initials } from '@/lib/utils';
 import Avatar from "@/components/Avatar";
 import "./messages.css";
 
@@ -153,9 +154,6 @@ export default function MessagesPage() {
     }
     setSending(false);
   };
-
-  const initials = (name: string) =>
-    name?.split(' ').map((n: string) => n[0]).slice(0, 2).join('').toUpperCase() || '??';
 
   const formatTime = (iso: string) =>
     new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });

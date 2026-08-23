@@ -3,12 +3,10 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { initials } from '@/lib/utils';
 import { useParams, useRouter } from "next/navigation";
 import "./project-detail.css";
 import Avatar from '@/components/Avatar';
-
-const initials = (name: string) =>
-  name?.split(' ').map((n) => n[0]).slice(0, 2).join('').toUpperCase() || '??';
 
 const notify = async (userId: string, type: string, title: string, body: string, link: string) => {
   await supabase.from('notifications').insert({ user_id: userId, type, title, body, link, read: false });

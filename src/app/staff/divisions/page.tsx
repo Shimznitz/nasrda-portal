@@ -4,12 +4,10 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
+import { initials } from '@/lib/utils';
 import { useRouter } from "next/navigation";
 import Avatar from "@/components/Avatar";
 import "./divisions.css";
-
-const initials = (name: string) =>
-  name?.split(' ').map((n) => n[0]).slice(0, 2).join('').toUpperCase() || '??';
 
 // ── These MUST be outside the page component to prevent remount on every render
 function SearchDropdown({ headSearch, setHeadSearch, searching, searchResults, onSelect }: {

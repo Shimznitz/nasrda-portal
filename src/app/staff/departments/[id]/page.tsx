@@ -5,11 +5,10 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
+import { initials } from '@/lib/utils';
 import Avatar from '@/components/Avatar';
 import './department-detail.css';
 
-const initials = (name: string) =>
-  name?.split(' ').map((n) => n[0]).slice(0, 2).join('').toUpperCase() || '??';
 
 const STATUS_CLASS: Record<string, string> = {
   COMPLETED: 'deptd-badge-done',

@@ -4,6 +4,7 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { initials, getFirstName } from '@/lib/utils';
 import { useRouter } from "next/navigation";
 import "./dashboard.css";
 
@@ -100,7 +101,7 @@ function DGDashboard({ profile }: { profile: any }) {
       <div className="db-header">
         <div className="db-header-left">
           <p className="db-eyebrow">{getGreeting()}, Director General</p>
-          <h1 className="db-title">{profile.name?.split(' ')[0]}<span className="db-title-dot">.</span></h1>
+          <h1 className="db-title">{getFirstName(profile?.name)}<span className="db-title-dot">.</span></h1>
           <p className="db-subtitle">National Space Research and Development Agency — Executive Overview</p>
         </div>
         <div className="db-role-badge">Director General</div>
@@ -316,7 +317,7 @@ function DeptAdminDashboard({ profile }: { profile: any }) {
       <div className="db-header">
         <div className="db-header-left">
           <p className="db-eyebrow">{getGreeting()}</p>
-          <h1 className="db-title">{profile.name?.split(' ')[0]}<span className="db-title-dot">.</span></h1>
+          <h1 className="db-title">{getFirstName(profile?.name)}<span className="db-title-dot">.</span></h1>
           <p className="db-subtitle">
             {dept?.name ? `Department of ${dept.name}` : 'Department Dashboard'}
             {isESS && <span className="db-ess-tag">ESS</span>}
@@ -511,7 +512,7 @@ function DivisionHeadDashboard({ profile }: { profile: any }) {
       <div className="db-header">
         <div className="db-header-left">
           <p className="db-eyebrow">{getGreeting()}</p>
-          <h1 className="db-title">{profile.name?.split(' ')[0]}<span className="db-title-dot">.</span></h1>
+          <h1 className="db-title">{getFirstName(profile?.name)}<span className="db-title-dot">.</span></h1>
           <p className="db-subtitle">
             {division?.name || 'Division Dashboard'}
             {division?.department?.name && <span className="db-breadcrumb"> · {division.department.name}</span>}
@@ -685,7 +686,7 @@ function UnitHeadDashboard({ profile }: { profile: any }) {
       <div className="db-header">
         <div className="db-header-left">
           <p className="db-eyebrow">{getGreeting()}</p>
-          <h1 className="db-title">{profile.name?.split(' ')[0]}<span className="db-title-dot">.</span></h1>
+          <h1 className="db-title">{getFirstName(profile?.name)}<span className="db-title-dot">.</span></h1>
           <p className="db-subtitle">
             {unit?.name || 'Unit Dashboard'}
             {unit?.division?.name && <span className="db-breadcrumb"> · {unit.division.name}</span>}
@@ -858,7 +859,7 @@ function StaffDashboard({ profile }: { profile: any }) {
       <div className="db-header">
         <div className="db-header-left">
           <p className="db-eyebrow">{getGreeting()}</p>
-          <h1 className="db-title">{profile.name?.split(' ')[0]}<span className="db-title-dot">.</span></h1>
+          <h1 className="db-title">{getFirstName(profile?.name)}<span className="db-title-dot">.</span></h1>
           <p className="db-subtitle">{profile.designation || formatRole(profile.role)}</p>
         {/* Org breadcrumb */}
           <div className="db-org-breadcrumb">

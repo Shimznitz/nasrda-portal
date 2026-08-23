@@ -31,45 +31,69 @@ export default function AuthPage() {
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setError('');
-    setSuccess('');
+  e.preventDefault();
+  setLoading(true);
+  setError('');
+  setSuccess('');
 
-    if (isLogin) {
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) setError(error.message);
-      else window.location.href = '/staff/dashboard';
-    } else {
-      const { data, error: signUpError } = await supabase.auth.signUp({
-        email,
-        password,
-      });
-
-      if (signUpError) {
-        setError(signUpError.message);
-      } else if (data.user) {
-        // Insert profile
-        const { error: profileError } = await supabase.from('profiles').insert({
-          id: data.user.id,
-          name: name.trim(),
-          staff_no: staffNo.trim(),
-          designation: designation.trim(),
-          role: 'STAFF',
-          // Explicitly handle the assignment
-          department_id: deptId && deptId !== "" ? deptId : null, 
-        });
-
-        if (profileError) {
-          setError(profileError.message);
-        } else {
-          setSuccess('Account created! Please wait for DG clearance.');
-          setIsLogin(true);
-        }
+  if (isLogin) {
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) setError(error.message);
+    else window.location.href = '/staff/dashboard';
+  } else {
+    // Standardize staff number input to format: NASRDA/PF/NUMBER
+    let formattedStaffNo = staffNo.trim().toUpperCase();
+    if (!formattedStaffNo.startsWith('NASRDA/PF/')) {
+      // If user only typed numbers (e.g., '1234'), prefix it automatically
+      const digitsOnly = formattedStaffNo.replace(/[^0-9]/g, '');
+      if (digitsOnly) {
+        formattedStaffNo = `NASRDA/PF/${digitsOnly}`;
+      } else {
+        setError('Please enter a valid Staff File Number (e.g. NASRDA/PF/1234)');
+        setLoading(false);
+        return;
       }
     }
-    setLoading(false);
-  };
+
+    // 1. Pass user metadata so auth trigger picks up full name
+    const { data, error: signUpError } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: {
+          name: name.trim(),
+          full_name: name.trim(),
+        },
+      },
+    });
+
+    if (signUpError) {
+      setError(signUpError.message);
+    } else if (data.user) {
+      // 2. Upsert profile with formatted NASRDA/PF number
+      const { error: profileError } = await supabase.from('profiles').upsert(
+        {
+          id: data.user.id,
+          email: email.trim(),
+          name: name.trim(),
+          staff_no: formattedStaffNo,
+          designation: designation.trim(),
+          role: 'STAFF',
+          department_id: deptId && deptId !== "" ? deptId : null, 
+        },
+        { onConflict: 'id' }
+      );
+
+      if (profileError) {
+        setError(profileError.message);
+      } else {
+        setSuccess('Account created! Please wait for DG clearance.');
+        setIsLogin(true);
+      }
+    }
+  }
+  setLoading(false);
+};
 
   return (
     <div className="auth-page">
@@ -117,9 +141,18 @@ export default function AuthPage() {
                   </div>
                   <div className="field-row">
                     <div className="field-group">
-                      <label>Staff / File No.</label>
-                      <input type="text" placeholder="e.g. NASRDA/001" value={staffNo} onChange={(e) => setStaffNo(e.target.value)} required />
-                    </div>
+  <label>Staff / File No.</label>
+  <input 
+    type="text" 
+    placeholder="NASRDA/PF/1001" 
+    value={staffNo} 
+    onChange={(e) => setStaffNo(e.target.value)} 
+    required 
+  />
+  <span style={{ fontSize: '0.75rem', color: 'var(--text-dim)', marginTop: '4px', display: 'block' }}>
+    Format: NASRDA/PF/XXXX
+  </span>
+</div>
                     <div className="field-group">
                       <label>Designation</label>
                       <input type="text" placeholder="e.g. Senior Engineer" value={designation} onChange={(e) => setDesignation(e.target.value)} required />

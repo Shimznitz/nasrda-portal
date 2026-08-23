@@ -196,16 +196,46 @@
   min-width: 200px;
 }
 
-.triage-avatar {
-  width: 40px; height: 40px;
-  background: var(--gold-dim);
-  border: 1px solid var(--gold);
-  border-radius: 50%;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 0.78rem; font-weight: 700;
+.triage-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 2px;
+}
+
+.triage-staff-no {
+  font-size: 0.72rem;
   color: var(--gold);
   font-family: 'IBM Plex Mono', monospace;
+  background: var(--gold-dim);
+  border: 1px solid rgba(201,168,76,0.2);
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+
+.triage-avatar,
+.triage-avatar-img {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
   flex-shrink: 0;
+}
+
+.triage-avatar {
+  background: var(--gold-dim);
+  border: 1px solid var(--gold);
+  display: flex; 
+  align-items: center; 
+  justify-content: center;
+  font-size: 0.78rem; 
+  font-weight: 700;
+  color: var(--gold);
+  font-family: 'IBM Plex Mono', monospace;}
+
+  .triage-avatar-img {
+  object-fit: cover;
+  border: 1px solid var(--border);
 }
 
 .triage-info { flex: 1; min-width: 0; }

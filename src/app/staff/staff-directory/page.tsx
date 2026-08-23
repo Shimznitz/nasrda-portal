@@ -4,6 +4,7 @@
 
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
+import { initials } from '@/lib/utils';
 import './staff-directory.css';
 
 const fmt = (role: string) =>
@@ -127,21 +128,21 @@ export default function StaffDirectoryPage() {
         <div className="sd-empty"><p>No staff found.</p></div>
       ) : (
         <div className={`sd-grid ${isPrivileged ? 'sd-grid-detail' : ''}`}>
-          {filtered.map((s: any) => (
-            <div key={s.id} className={`sd-card ${isPrivileged ? 'sd-card-detail' : ''}`}>
-              {/* Avatar */}
-              <div className="sd-card-top">
-                {s.avatar_url ? (
-                  <img src={s.avatar_url} alt={s.name} className="sd-avatar-img" />
-                ) : (
-                  <div className="sd-avatar">{inits(s.name || '')}</div>
-                )}
-                <div className="sd-card-name-block">
-                  <div className="sd-card-name">{s.name || 'Unnamed'}</div>
-                  {s.designation && <div className="sd-card-desig">{s.designation}</div>}
-                  <div className="sd-card-email">{s.email}</div>
-                </div>
-              </div>
+  {filtered.map((s: any) => (
+    <div key={s.id} className={`sd-card ${isPrivileged ? 'sd-card-detail' : ''}`}>
+      {/* Avatar */}
+      <div className="sd-card-top">
+        {s.avatar_url ? (
+          <img src={s.avatar_url} alt={s.name} className="sd-avatar-img" />
+        ) : (
+          <div className="sd-avatar">{initials(s.name)}</div>
+        )}
+        <div className="sd-card-name-block">
+          <div className="sd-card-name">{s.name || 'Unnamed'}</div>
+          {s.designation && <div className="sd-card-desig">{s.designation}</div>}
+          <div className="sd-card-email">{s.email}</div>
+        </div>
+      </div>
 
               {/* Role + org */}
               <div className="sd-card-meta">

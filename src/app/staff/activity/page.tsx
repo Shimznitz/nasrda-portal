@@ -5,10 +5,8 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
+import { initials } from '@/lib/utils';
 import './activity.css';
-
-const initials = (name: string) =>
-  name?.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase() || '??';
 
 const ACTION_META: Record<string, { icon: string; color: string }> = {
   CREATED:      { icon: '✦', color: 'var(--gold)' },

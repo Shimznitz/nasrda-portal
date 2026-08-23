@@ -3,6 +3,8 @@
 
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
+import { initials, getFirstName } from '@/lib/utils';
+
 import Link from "next/link";
 import Avatar from "@/components/Avatar";
 import "./Topbar.css";
@@ -81,14 +83,13 @@ export default function Topbar() {
 
   const name = profile?.name || 'User';
   const firstName = name.split(' ')[0];
-  const initials = name.slice(0, 2).toUpperCase();
   const role = profile?.role || 'STAFF';
 
   return (
     <header className="topbar">
       <div className="topbar-content">
         <div className="greeting">
-          Welcome back, <span className="highlight">{firstName}</span>
+          Welcome back, <span className="highlight">{getFirstName(profile?.name)}</span>
         </div>
 
         <div className="topbar-right">
