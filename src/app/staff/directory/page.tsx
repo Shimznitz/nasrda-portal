@@ -139,22 +139,30 @@ export default function StaffTriagePage() {
   };
 
   const assignDivision = async (staffId: string, divId: string) => {
-    setSaving(staffId);
-    const div = divisions.find(d => d.id === divId);
-    const updates = { division_id: divId || null, unit_id: null };
-
-    const { error } = await supabase.from('profiles').update(updates).eq('id', staffId);
-
-    if (!error) {
-      setStaff(prev => prev.map(s => s.id === staffId ? {
-        ...s,
-        ...updates,
-        divisions: div ? { name: div.name } : null,
-        units: null
-      } : s));
-    }
-    setSaving(null);
+  setSaving(staffId);
+  const targetId = divId || null;
+  const div = divisions.find(d => d.id === targetId);
+  
+  const updates = { 
+    division_id: targetId, 
+    unit_id: null 
   };
+
+  const { error } = await supabase.from('profiles').update(updates).eq('id', staffId);
+
+  if (error) {
+    console.error("Failed to assign division (Check RLS Policies):", error.message);
+    alert(`Failed to save: ${error.message}`);
+  } else {
+    setStaff(prev => prev.map(s => s.id === staffId ? {
+      ...s,
+      ...updates,
+      divisions: div ? { name: div.name } : null,
+      units: null
+    } : s));
+  }
+  setSaving(null);
+};
 
   const assignUnit = async (staffId: string, unitId: string) => {
     setSaving(staffId);

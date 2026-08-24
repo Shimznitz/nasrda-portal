@@ -1,7 +1,5 @@
 /*src/app/staff/units/[id]/page.tsx*/
 
-/* src/app/staff/units/[id]/page.tsx */
-
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -34,17 +32,27 @@ export default function UnitDetail() {
       const { data: { user } } = await supabase.auth.getUser();
       setCurrentUser(user);
 
-      const { data: unit } = await supabase
+      const { data: unit, error: unitError } = await supabase
         .from('units')
         .select(`
-          id, name, code, description,
+          id, name, description,
           head:profiles!units_head_id_fkey(id, name, designation, avatar_url),
-          division:divisions(id, name, department:departments(id, name))
-        `)
+          division:divisions(
+            id, 
+            name,
+            code,
+            department:departments(id, name)
+          )
+          `)
         .eq('id', id)
         .single();
 
-      if (!unit) { setLoading(false); return; }
+      if (unitError || !unit) {
+        console.error('Unit error details:', JSON.stringify(unitError, null, 2));
+        setData(null);
+        setLoading(false);
+        return;
+      }
 
       const [
         { data: staff },
@@ -98,14 +106,14 @@ export default function UnitDetail() {
       {/* Header */}
       <div className="ud-header">
         <div className="ud-header-left">
-          <div className="ud-header-eyebrow">
-            {data.division?.department?.name && <span>{data.division.department.name} · </span>}
-            {data.division?.name && <span>{data.division.name} · </span>}
-            Unit
-          </div>
+        <div className="ud-header-eyebrow">
+          {data.division?.department?.name && <span>{data.division.department.name} · </span>}
+          {data.division?.name && <span>{data.division.name} · </span>}
+          Unit
+        </div>
           <h1 className="ud-title">
             {data.name}
-            {data.code && <span className="ud-code">{data.code}</span>}
+            {data.division?.code && <span className="ud-code">{data.division.code}</span>}
           </h1>
           {data.description && <p className="ud-desc">{data.description}</p>}
           {data.head?.name && (
