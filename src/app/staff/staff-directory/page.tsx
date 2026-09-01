@@ -41,7 +41,7 @@ export default function StaffDirectoryPage() {
 
     // Base select — everyone gets
     const baseSelect = `
-      id, name, email, designation, role, staff_no, avatar_url,
+      id, name, title, email, designation, role, staff_no, avatar_url,
       qualification, degree_level, course_of_study, skills, bio,
       department:departments!profiles_department_id_fkey(id, name),
       division:divisions!profiles_division_id_fkey(name),
@@ -138,7 +138,9 @@ export default function StaffDirectoryPage() {
           <div className="sd-avatar">{initials(s.name)}</div>
         )}
         <div className="sd-card-name-block">
-          <div className="sd-card-name">{s.name || 'Unnamed'}</div>
+          <div className="sd-card-name">
+            {[s.title, s.name].filter(Boolean).join(' ') || 'Unnamed'}
+          </div>
           {s.designation && <div className="sd-card-desig">{s.designation}</div>}
           <div className="sd-card-email">{s.email}</div>
         </div>

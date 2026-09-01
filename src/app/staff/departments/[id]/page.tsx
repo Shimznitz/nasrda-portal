@@ -1,21 +1,20 @@
-/*src/app/staff/departments/[id]/page.tsx*/
+/* src/app/staff/departments/[id]/page.tsx */
 
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
-import { initials } from '@/lib/utils';
+import { displayName } from '@/lib/utils';
 import Avatar from '@/components/Avatar';
 import './department-details.css';
 
-
 const STATUS_CLASS: Record<string, string> = {
-  COMPLETED: 'deptd-badge-done',
-  UNDER_REVIEW: 'deptd-badge-review',
-  IN_PROGRESS: 'deptd-badge-active',
-  ACTIVE: 'deptd-badge-active',
-  PENDING: 'deptd-badge-pending',
+  COMPLETED: 'status-pill completed',
+  UNDER_REVIEW: 'status-pill idle',
+  IN_PROGRESS: 'status-pill progress',
+  ACTIVE: 'status-pill active',
+  PENDING: 'status-pill idle',
 };
 
 export default function DepartmentDetail() {
@@ -25,50 +24,75 @@ export default function DepartmentDetail() {
   const [loading, setLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState<any>(null);
 
+  // Search states
+  const [projectSearch, setProjectSearch] = useState('');
+  const [staffSearch, setStaffSearch] = useState('');
+  const [showAllStaff, setShowAllStaff] = useState(false);
+
   useEffect(() => {
     if (!id) return;
+
     const load = async () => {
       setLoading(true);
 
       const { data: { user } } = await supabase.auth.getUser();
       setCurrentUser(user);
 
-      const { data: dept } = await supabase
+      // 1. Fetch department details
+      const { data: dept, error: deptError } = await supabase
         .from('departments')
         .select(`
-          id, name, code, description,
-          head:profiles!departments_head_id_fkey(id, name, designation, avatar_url)
+          id, name, description,
+          head:profiles!departments_head_id_fkey(id, name, title, designation, avatar_url)
         `)
         .eq('id', id)
-        .single();
+        .maybeSingle();
 
-      if (!dept) { setLoading(false); return; }
+      if (deptError) {
+        console.error('Department fetch error:', deptError);
+        setLoading(false);
+        return;
+      }
 
+      if (!dept) {
+        setLoading(false);
+        return;
+      }
+
+      // 2. Sub-resource fetches
       const [
-        { data: divisions },
-        { data: staff },
-        { data: projects },
+        { data: divisions, error: divError },
+        { data: staff, error: staffError },
+        { data: projects, error: projError },
       ] = await Promise.all([
         supabase.from('divisions')
-          .select('id, name, code, description, head:profiles!divisions_head_id_fkey(name)')
+          .select('id, name, code, description, head:profiles!divisions_head_id_fkey(name, title)')
           .eq('department_id', id as string)
           .order('name'),
         supabase.from('profiles')
-          .select('id, name, designation, role, avatar_url, division_id, divisions:divisions!profiles_division_id_fkey(name)')
+          .select('id, name, title, designation, role, avatar_url, division_id, divisions:divisions!profiles_division_id_fkey(name)')
           .eq('department_id', id as string)
           .order('name'),
         supabase.from('projects')
           .select('id, title, status, progress, due_date, created_at')
           .eq('dept_scope_id', id as string)
           .order('created_at', { ascending: false })
-          .limit(10),
+          .limit(50),
       ]);
 
-      // Divisions with staff counts
-      const divisionsWithCounts = await Promise.all((divisions || []).map(async (div: any) => {
-        const { count } = await supabase
-          .from('profiles').select('id', { count: 'exact', head: true }).eq('division_id', div.id);
-        return { ...div, staffCount: count ?? 0 };
+      if (divError) console.error('Divisions fetch error:', divError);
+      if (staffError) console.error('Staff fetch error:', staffError);
+      if (projError) console.error('Projects fetch error:', projError);
+
+      const staffList = staff || [];
+      const staffByDivision = staffList.reduce((acc: Record<string, number>, s: any) => {
+        if (s.division_id) acc[s.division_id] = (acc[s.division_id] || 0) + 1;
+        return acc;
+      }, {});
+
+      const divisionsWithCounts = (divisions || []).map((div: any) => ({
+        ...div,
+        staffCount: staffByDivision[div.id] ?? 0,
       }));
 
       const activeProjects = (projects || []).filter(p => p.status !== 'COMPLETED').length;
@@ -77,171 +101,295 @@ export default function DepartmentDetail() {
       setData({
         ...dept,
         divisions: divisionsWithCounts,
-        staff: staff || [],
+        staff: staffList,
         projects: projects || [],
         stats: {
           divisionCount: divisions?.length ?? 0,
-          staffCount: staff?.length ?? 0,
+          staffCount: staffList.length,
           activeProjects,
           completedProjects,
         },
       });
+
       setLoading(false);
     };
+
     load();
   }, [id]);
 
-  if (loading) return (
-    <div className="deptd-loading">
-      <div className="deptd-loading-bar" />
-      <span>Loading department…</span>
-    </div>
-  );
+  // Filtered queries
+  const filteredProjects = useMemo(() => {
+    if (!data?.projects) return [];
+    return data.projects.filter((p: any) =>
+      p.title.toLowerCase().includes(projectSearch.toLowerCase())
+    );
+  }, [data?.projects, projectSearch]);
 
-  if (!data) return <div className="deptd-not-found">Department not found.</div>;
+  const filteredStaff = useMemo(() => {
+    if (!data?.staff) return [];
+    return data.staff.filter((s: any) => {
+      const full = displayName(s).toLowerCase();
+      const role = (s.designation || s.role || '').toLowerCase();
+      const q = staffSearch.toLowerCase();
+      return full.includes(q) || role.includes(q);
+    });
+  }, [data?.staff, staffSearch]);
+
+  const visibleStaff = useMemo(() => {
+    if (staffSearch || showAllStaff) return filteredStaff;
+    return filteredStaff.slice(0, 8);
+  }, [filteredStaff, staffSearch, showAllStaff]);
+
+  if (loading) {
+    return <div className="telemetry-loading">Loading department telemetry…</div>;
+  }
+
+  if (!data) return <div className="telemetry-error">Department not found.</div>;
 
   return (
-    <div className="deptd-page">
-      {/* Back */}
-      <button className="deptd-back" onClick={() => router.push('/staff/departments')}>
-        ← Departments
-      </button>
+    <div className="dept-details-container">
+      {/* Header Banner */}
+      <div className="insight-header-banner">
+        <span className="accent-pill">Department Overview</span>
+        <h1>{data.name}</h1>
+        {data.description && <p className="location-tag">{data.description}</p>}
+      </div>
 
-      {/* Header */}
-      <div className="deptd-header">
-        <div className="deptd-header-left">
-          <div className="deptd-header-eyebrow">Department</div>
-          <h1 className="deptd-title">
-            {data.name}
-            {data.code && <span className="deptd-code">{data.code}</span>}
-          </h1>
-          {data.description && <p className="deptd-desc">{data.description}</p>}
-          {data.head?.name && (
-            <div className="deptd-head-row">
-              <Avatar avatarUrl={data.head.avatar_url} name={data.head.name} size="sm" />
-              <div>
-                <div className="deptd-head-name">{data.head.name}</div>
-                <div className="deptd-head-role">{data.head.designation || 'Department Head'}</div>
-              </div>
-            </div>
-          )}
+      {/* Analytics Grid */}
+      <div className="analytics-dashboard-grid">
+        <div className="metric-box">
+          <div className="metric-label">Divisions</div>
+          <div className="metric-row">
+            <div className="metric-num">{data.stats.divisionCount}</div>
+            <span className="trend-indicator textual">Active Units</span>
+          </div>
+          <div className="mini-progress-track">
+            <div className="fill-bar" style={{ width: '100%' }} />
+          </div>
         </div>
 
-        <div className="deptd-metrics">
-          <div className="deptd-metric">
-            <div className="deptd-metric-value">{data.stats.divisionCount}</div>
-            <div className="deptd-metric-label">Divisions</div>
+        <div className="metric-box">
+          <div className="metric-label">Total Staff</div>
+          <div className="metric-row">
+            <div className="metric-num">{data.stats.staffCount}</div>
+            <span className="trend-indicator upward">Members</span>
           </div>
-          <div className="deptd-metric">
-            <div className="deptd-metric-value">{data.stats.staffCount}</div>
-            <div className="deptd-metric-label">Staff</div>
+          <div className="mini-progress-track">
+            <div className="fill-bar gold-fill" style={{ width: '100%' }} />
           </div>
-          <div className="deptd-metric">
-            <div className="deptd-metric-value">{data.stats.activeProjects}</div>
-            <div className="deptd-metric-label">Active Projects</div>
+        </div>
+
+        <div className="metric-box">
+          <div className="metric-label">Active Projects</div>
+          <div className="metric-row">
+            <div className="metric-num">{data.stats.activeProjects}</div>
+            <span className="trend-indicator upward">In Progress</span>
           </div>
-          <div className="deptd-metric">
-            <div className="deptd-metric-value">{data.stats.completedProjects}</div>
-            <div className="deptd-metric-label">Completed</div>
+          <div className="mini-progress-track">
+            <div className="fill-bar" style={{ width: `${(data.stats.activeProjects / (data.projects.length || 1)) * 100}%` }} />
+          </div>
+        </div>
+
+        <div className="metric-box">
+          <div className="metric-label">Completed</div>
+          <div className="metric-row">
+            <div className="metric-num">{data.stats.completedProjects}</div>
+            <span className="trend-indicator upward">Delivered</span>
+          </div>
+          <div className="mini-progress-track">
+            <div className="fill-bar success-fill" style={{ width: `${(data.stats.completedProjects / (data.projects.length || 1)) * 100}%` }} />
           </div>
         </div>
       </div>
 
-      <div className="deptd-grid">
-        {/* Divisions */}
-        <div className="deptd-panel">
-          <div className="deptd-panel-header">
-            <span className="deptd-panel-title">Divisions</span>
-            <span className="deptd-panel-count">{data.divisions.length}</span>
+      {/* Main Split Content */}
+      <div className="insight-sections-split">
+        {/* Main Column */}
+        <div className="section-main-card">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+            <h3 style={{ margin: 0 }}>Active Projects</h3>
+            <input
+              type="text"
+              placeholder="Filter projects…"
+              value={projectSearch}
+              onChange={(e) => setProjectSearch(e.target.value)}
+              style={{
+                background: 'var(--bg3)',
+                border: '1px solid var(--border)',
+                color: 'var(--text)',
+                padding: '6px 12px',
+                borderRadius: 8,
+                fontSize: '0.82rem',
+                outline: 'none',
+                width: '180px',
+              }}
+            />
           </div>
-          {data.divisions.length === 0 ? (
-            <div className="deptd-empty">No divisions in this department.</div>
-          ) : (
-            <div className="deptd-div-list">
-              {data.divisions.map((d: any) => (
-                <div
-                  key={d.id}
-                  className="deptd-div-row"
-                  onClick={() => router.push(`/staff/divisions/${d.id}`)}
-                >
-                  <div className="deptd-div-info">
-                    <div className="deptd-div-name">
-                      {d.name}
-                      {d.code && <span className="deptd-code">{d.code}</span>}
-                    </div>
-                    <div className="deptd-div-head">{d.head?.name || 'No head assigned'}</div>
-                  </div>
-                  <span className="deptd-chip">{d.staffCount} staff</span>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
 
-        {/* Projects */}
-        <div className="deptd-panel">
-          <div className="deptd-panel-header">
-            <span className="deptd-panel-title">Projects</span>
-            <span className="deptd-panel-count">{data.projects.length}</span>
-          </div>
-          {data.projects.length === 0 ? (
-            <div className="deptd-empty">No projects scoped to this department.</div>
+          {filteredProjects.length === 0 ? (
+            <div className="empty-table-state">
+              {projectSearch ? 'No matching projects found.' : 'No projects scoped to this department.'}
+            </div>
           ) : (
-            <div className="deptd-project-list">
-              {data.projects.map((p: any) => (
+            <div className="telemetry-table">
+              <div className="table-row table-header">
+                <div>Project Title</div>
+                <div>Status</div>
+                <div>Progress</div>
+              </div>
+              {filteredProjects.map((p: any) => (
                 <div
                   key={p.id}
-                  className="deptd-project-row"
+                  className="table-row"
+                  style={{ cursor: 'pointer' }}
                   onClick={() => router.push(`/staff/projects/${p.id}`)}
                 >
-                  <div className="deptd-project-top">
-                    <span className="deptd-project-name">{p.title}</span>
-                    <span className={`deptd-badge ${STATUS_CLASS[p.status] || 'deptd-badge-active'}`}>
+                  <div className="proj-title-cell">{p.title}</div>
+                  <div>
+                    <span className={STATUS_CLASS[p.status] || 'status-pill idle'}>
                       {p.status?.replace(/_/g, ' ') || 'ACTIVE'}
                     </span>
                   </div>
-                  <div className="deptd-prog-track">
-                    <div className="deptd-prog-fill" style={{ width: `${p.progress ?? 0}%` }} />
-                  </div>
-                  <div className="deptd-project-meta">
-                    <span>{p.progress ?? 0}% complete</span>
-                    {p.due_date && (
-                      <span>Due {new Date(p.due_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</span>
-                    )}
+                  <div>
+                    <div className="health-bar-container">
+                      <div
+                        className={`health-fill ${p.progress >= 75 ? 'green' : 'yellow'}`}
+                        style={{ width: `${p.progress ?? 0}%` }}
+                      />
+                    </div>
                   </div>
                 </div>
               ))}
             </div>
           )}
-        </div>
-      </div>
 
-      {/* Staff roster */}
-      <div className="deptd-panel deptd-panel-full">
-        <div className="deptd-panel-header">
-          <span className="deptd-panel-title">Staff Roster</span>
-          <span className="deptd-panel-count">{data.staff.length} members</span>
-        </div>
-        {data.staff.length === 0 ? (
-          <div className="deptd-empty">No staff assigned to this department yet.</div>
-        ) : (
-          <div className="deptd-staff-grid">
-            {data.staff.map((s: any) => (
-              <div key={s.id} className="deptd-staff-card">
-                <Avatar avatarUrl={s.avatar_url} name={s.name} size="md" />
-                <div className="deptd-staff-info">
-                  <div className="deptd-staff-name">{s.name}</div>
-                  <div className="deptd-staff-role">{s.designation || '—'}</div>
-                  {s.divisions?.name && <div className="deptd-staff-unit">{s.divisions.name}</div>}
-                </div>
+          <h3 style={{ marginTop: 40, marginBottom: 20 }}>Divisions</h3>
+          {data.divisions.length === 0 ? (
+            <div className="empty-table-state">No divisions configured.</div>
+          ) : (
+            <div className="telemetry-table">
+              <div className="table-row table-header">
+                <div>Division Name</div>
+                <div>Head</div>
+                <div>Staff</div>
               </div>
-            ))}
-          </div>
-        )}
-      </div>
+              {data.divisions.map((d: any) => (
+                <div
+                  key={d.id}
+                  className="table-row"
+                  style={{ cursor: 'pointer' }}
+                  onClick={() => router.push(`/staff/divisions/${d.id}`)}
+                >
+                  <div className="proj-title-cell">{d.name}</div>
+                  <div>{d.head ? displayName(d.head) : '—'}</div>
+                  <div>{d.staffCount} members</div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
 
-      {/* Org Drives panel */}
-      <OrgDrivesPanel entityType="DEPARTMENT" entityId={id as string} currentUser={currentUser} />
+        {/* Sidebar Column */}
+        <div className="section-side-card">
+          <h3>Department Leadership</h3>
+          {data.head ? (
+            <div className="meta-profile-capsule">
+              <Avatar avatarUrl={data.head.avatar_url} name={displayName(data.head)} size="md" />
+              <div>
+                <div className="meta-name">{displayName(data.head)}</div>
+                <div className="meta-title">{data.head.designation || data.head.title || 'Department Head'}</div>
+              </div>
+            </div>
+          ) : (
+            <div className="empty-table-state" style={{ padding: '16px 0' }}>No head assigned</div>
+          )}
+
+          {/* Compact Staff Roster */}
+          <div style={{ marginTop: 32 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <h3 style={{ margin: 0 }}>Staff ({data.staff.length})</h3>
+              <input
+                type="text"
+                placeholder="Search staff…"
+                value={staffSearch}
+                onChange={(e) => setStaffSearch(e.target.value)}
+                style={{
+                  background: 'var(--bg3)',
+                  border: '1px solid var(--border)',
+                  color: 'var(--text)',
+                  padding: '4px 10px',
+                  borderRadius: 6,
+                  fontSize: '0.78rem',
+                  outline: 'none',
+                  width: '120px',
+                }}
+              />
+            </div>
+
+            {filteredStaff.length === 0 ? (
+              <div className="empty-table-state" style={{ padding: '16px 0' }}>
+                {staffSearch ? 'No staff matching filter.' : 'No staff members listed.'}
+              </div>
+            ) : (
+              <>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: 8 }}>
+                  {visibleStaff.map((s: any) => (
+                    <div
+                      key={s.id}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 8,
+                        background: 'var(--bg3)',
+                        border: '1px solid var(--border)',
+                        borderRadius: 8,
+                        padding: '6px 8px',
+                        overflow: 'hidden',
+                      }}
+                      title={`${displayName(s)} - ${s.designation || s.role || 'Member'}`}
+                    >
+                      <Avatar avatarUrl={s.avatar_url} name={displayName(s)} size="sm" />
+                      <div style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                        <span style={{ fontSize: '0.78rem', fontWeight: 500, color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {displayName(s)}
+                        </span>
+                        <span style={{ fontSize: '0.68rem', color: 'var(--text3)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {s.designation || s.role || 'Member'}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {!staffSearch && filteredStaff.length > 8 && (
+                  <button
+                    onClick={() => setShowAllStaff(!showAllStaff)}
+                    style={{
+                      width: '100%',
+                      marginTop: 10,
+                      background: 'transparent',
+                      border: '1px dashed var(--border)',
+                      color: 'var(--text3)',
+                      padding: '6px',
+                      borderRadius: 6,
+                      fontSize: '0.75rem',
+                      fontFamily: "'IBM Plex Mono', monospace",
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {showAllStaff ? 'Collapse Roster ↑' : `+ ${filteredStaff.length - 8} More Members`}
+                  </button>
+                )}
+              </>
+            )}
+          </div>
+
+          {/* Org Drives */}
+          <div style={{ marginTop: 32 }}>
+            <OrgDrivesPanel entityType="DEPARTMENT" entityId={id as string} currentUser={currentUser} />
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -277,45 +425,43 @@ function OrgDrivesPanel({ entityType, entityId, currentUser }: any) {
   };
 
   return (
-    <div className="deptd-panel deptd-panel-full" style={{ marginTop: 20 }}>
-      <div className="deptd-panel-header">
-        <span className="deptd-panel-title">🗂 Org Drives</span>
-        <button className="div-btn-gold" style={{ fontSize: '0.78rem', padding: '5px 12px' }}
-          onClick={() => setShowAdd(!showAdd)}>
-          {showAdd ? 'Cancel' : '+ Add Drive'}
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+        <h3 style={{ margin: 0 }}>🗂 Org Drives</h3>
+        <button className="accent-pill" style={{ cursor: 'pointer', margin: 0 }} onClick={() => setShowAdd(!showAdd)}>
+          {showAdd ? 'Cancel' : '+ Add'}
         </button>
       </div>
 
       {showAdd && (
-        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 12 }}>
-          <input className="div-input" style={{ flex: 1, minWidth: 140 }}
-            placeholder="Drive name (e.g. Department Assets)"
-            value={name} onChange={e => setName(e.target.value)} />
-          <input className="div-input" style={{ flex: 2, minWidth: 200 }}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 }}>
+          <input
+            style={{ background: 'var(--bg3)', border: '1px solid var(--border)', color: 'var(--text)', padding: '8px 12px', borderRadius: 6, fontSize: '0.82rem' }}
+            placeholder="Drive name"
+            value={name} onChange={e => setName(e.target.value)}
+          />
+          <input
+            style={{ background: 'var(--bg3)', border: '1px solid var(--border)', color: 'var(--text)', padding: '8px 12px', borderRadius: 6, fontSize: '0.82rem' }}
             placeholder="https://drive.google.com/…"
-            value={url} onChange={e => setUrl(e.target.value)} />
-          <button className="div-btn-gold" onClick={add} disabled={saving}>
-            {saving ? 'Adding…' : 'Add'}
+            value={url} onChange={e => setUrl(e.target.value)}
+          />
+          <button className="accent-pill" style={{ cursor: 'pointer' }} onClick={add} disabled={saving}>
+            {saving ? 'Adding…' : 'Save Drive'}
           </button>
         </div>
       )}
 
       {drives.length === 0 ? (
-        <div className="deptd-empty">No drives added yet.</div>
+        <div className="empty-table-state" style={{ padding: '12px 0' }}>No drives connected.</div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {drives.map((d: any) => (
-            <div key={d.id} style={{
-              display: 'flex', alignItems: 'center', gap: 10,
-              background: 'var(--bg3)', borderRadius: 8, padding: '8px 12px',
-            }}>
-              <span style={{ fontSize: '0.88rem', color: 'var(--text)', flex: 1 }}>{d.name}</span>
-              <a href={d.drive_url} target="_blank" rel="noreferrer"
-                style={{ fontSize: '0.78rem', color: 'var(--gold)' }}>Open →</a>
-              <button onClick={() => remove(d.id)}
-                style={{ background: 'none', border: 'none', color: '#e05c5c', cursor: 'pointer', fontSize: '0.8rem' }}>
-                ✕
-              </button>
+            <div key={d.id} className="meta-profile-capsule" style={{ marginBottom: 0, padding: 10, justifyContent: 'space-between' }}>
+              <span style={{ fontSize: '0.82rem', color: 'var(--text)' }}>{d.name}</span>
+              <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                <a href={d.drive_url} target="_blank" rel="noreferrer" style={{ fontSize: '0.78rem', color: 'var(--gold)' }}>Open →</a>
+                <button onClick={() => remove(d.id)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer' }}>✕</button>
+              </div>
             </div>
           ))}
         </div>

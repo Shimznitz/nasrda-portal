@@ -3,7 +3,7 @@
 
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
-import { initials, getFirstName } from '@/lib/utils';
+import { initials, getFirstName, displayName } from '@/lib/utils';
 
 import Link from "next/link";
 import Avatar from "@/components/Avatar";
@@ -81,15 +81,15 @@ export default function Topbar() {
     setIsLight(!isLight);
   };
 
-  const name = profile?.name || 'User';
-  const firstName = name.split(' ')[0];
+  const userDisplayName = displayName(profile);
+  const formattedFirstName = getFirstName(profile?.name, profile?.title);
   const role = profile?.role || 'STAFF';
 
   return (
     <header className="topbar">
       <div className="topbar-content">
         <div className="greeting">
-          Welcome back, <span className="highlight">{getFirstName(profile?.name)}</span>
+          Welcome back, <span className="highlight">{formattedFirstName}</span>
         </div>
 
         <div className="topbar-right">
@@ -109,11 +109,11 @@ export default function Topbar() {
 
           <div className="user-info">
             <div>
-              <div className="user-name">{name}</div>
+              <div className="user-name">{userDisplayName}</div>
               <div className="user-role">{role}</div>
             </div>
             <Link href="/staff/profile" style={{ textDecoration: 'none' }}>
-              <Avatar name={profile?.name} avatarUrl={profile?.avatar_url} size="md" />
+              <Avatar name={formattedFirstName} avatarUrl={profile?.avatar_url} size="md" />
             </Link>
           </div>
         </div>

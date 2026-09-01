@@ -290,3 +290,83 @@
   color: var(--text3);
   font-size: 1.1rem;
 }
+
+/* Sticky layout for side column to prevent dead whitespace */
+.insight-sections-split {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 24px;
+  align-items: start;
+}
+
+.section-side-card {
+  position: sticky;
+  top: 24px;
+}
+
+/* Compact Staff Roster Grid (Replaces bulky full-width capsules) */
+.staff-roster-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.roster-chip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+.roster-chip:hover {
+  border-color: rgba(212, 175, 55, 0.4);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.roster-info {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.roster-name {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.roster-role {
+  font-size: 0.7rem;
+  color: var(--text3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Minimal expand button for overflow staff */
+.roster-toggle-btn {
+  width: 100%;
+  margin-top: 12px;
+  background: transparent;
+  border: 1px dashed var(--border);
+  color: var(--text3);
+  padding: 8px;
+  border-radius: 8px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.roster-toggle-btn:hover {
+  color: var(--gold);
+  border-color: var(--gold);
+}

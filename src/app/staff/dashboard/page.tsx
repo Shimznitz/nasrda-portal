@@ -4,7 +4,7 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
-import { initials, getFirstName } from '@/lib/utils';
+import { initials, getFirstName, displayName } from '@/lib/utils';
 import { useRouter } from "next/navigation";
 import "./dashboard.css";
 
@@ -101,7 +101,7 @@ function DGDashboard({ profile }: { profile: any }) {
       <div className="db-header">
         <div className="db-header-left">
           <p className="db-eyebrow">{getGreeting()}, Director General</p>
-          <h1 className="db-title">{getFirstName(profile?.name)}<span className="db-title-dot">.</span></h1>
+          <h1 className="db-title">{getFirstName(profile?.name, profile?.title)}<span className="db-title-dot">.</span></h1>
           <p className="db-subtitle">National Space Research and Development Agency — Executive Overview</p>
         </div>
         <div className="db-role-badge">Director General</div>
@@ -143,7 +143,7 @@ function DGDashboard({ profile }: { profile: any }) {
               <div key={d.id} className="db-dept-row">
                 <div className="db-dept-left">
                   <div className="db-dept-name">{d.name}</div>
-                  <div className="db-dept-head">{d.head?.name || 'No head assigned'}</div>
+                  <div className="db-dept-head">{d.head ? displayName(d.head) : 'No head assigned'}</div>
                 </div>
                 <div className="db-dept-stats">
                   <span className="db-dept-chip">{d.staffCount} staff</span>
@@ -317,7 +317,7 @@ function DeptAdminDashboard({ profile }: { profile: any }) {
       <div className="db-header">
         <div className="db-header-left">
           <p className="db-eyebrow">{getGreeting()}</p>
-          <h1 className="db-title">{getFirstName(profile?.name)}<span className="db-title-dot">.</span></h1>
+          <h1 className="db-title">{getFirstName(profile?.name, profile?.title)}<span className="db-title-dot">.</span></h1>
           <p className="db-subtitle">
             {dept?.name ? `Department of ${dept.name}` : 'Department Dashboard'}
             {isESS && <span className="db-ess-tag">ESS</span>}
@@ -362,7 +362,7 @@ function DeptAdminDashboard({ profile }: { profile: any }) {
               <div key={d.id} className="db-dept-row">
                 <div className="db-dept-left">
                   <div className="db-dept-name">{d.name} {d.code && <span className="db-code-tag">{d.code}</span>}</div>
-                  <div className="db-dept-head">{d.head?.name || 'No head assigned'}</div>
+                  <div className="db-dept-head">{d.head ? displayName(d.head) : 'No head assigned'}</div>
                 </div>
                 <div className="db-dept-stats">
                   <span className="db-dept-chip">{d.staffCount} staff</span>
@@ -512,7 +512,7 @@ function DivisionHeadDashboard({ profile }: { profile: any }) {
       <div className="db-header">
         <div className="db-header-left">
           <p className="db-eyebrow">{getGreeting()}</p>
-          <h1 className="db-title">{getFirstName(profile?.name)}<span className="db-title-dot">.</span></h1>
+          <h1 className="db-title">{getFirstName(profile?.name, profile?.title)}<span className="db-title-dot">.</span></h1>
           <p className="db-subtitle">
             {division?.name || 'Division Dashboard'}
             {division?.department?.name && <span className="db-breadcrumb"> · {division.department.name}</span>}
@@ -554,7 +554,7 @@ function DivisionHeadDashboard({ profile }: { profile: any }) {
                 <div key={u.id} className="db-dept-row">
                   <div className="db-dept-left">
                     <div className="db-dept-name">{u.name}</div>
-                    <div className="db-dept-head">{u.head?.name || 'No head assigned'}</div>
+                    <div className="db-dept-head">{u.head ? displayName(u.head) : 'No head assigned'}</div>
                   </div>
                   <span className="db-dept-chip">{u.staffCount} staff</span>
                 </div>
@@ -686,7 +686,7 @@ function UnitHeadDashboard({ profile }: { profile: any }) {
       <div className="db-header">
         <div className="db-header-left">
           <p className="db-eyebrow">{getGreeting()}</p>
-          <h1 className="db-title">{getFirstName(profile?.name)}<span className="db-title-dot">.</span></h1>
+          <h1 className="db-title">{getFirstName(profile?.name, profile?.title)}<span className="db-title-dot">.</span></h1>
           <p className="db-subtitle">
             {unit?.name || 'Unit Dashboard'}
             {unit?.division?.name && <span className="db-breadcrumb"> · {unit.division.name}</span>}
@@ -859,7 +859,7 @@ function StaffDashboard({ profile }: { profile: any }) {
       <div className="db-header">
         <div className="db-header-left">
           <p className="db-eyebrow">{getGreeting()}</p>
-          <h1 className="db-title">{getFirstName(profile?.name)}<span className="db-title-dot">.</span></h1>
+          <h1 className="db-title">{getFirstName(profile?.name, profile?.title)}<span className="db-title-dot">.</span></h1>
           <p className="db-subtitle">{profile.designation || formatRole(profile.role)}</p>
         {/* Org breadcrumb */}
           <div className="db-org-breadcrumb">

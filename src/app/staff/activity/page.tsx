@@ -48,7 +48,7 @@ export default function ActivityPage() {
       .from('activity_logs')
       .select(`
         id, entity_type, entity_id, action, note, meta, created_at,
-        actor:profiles!actor_id(id, name, designation)
+        actor:profiles!actor_id(id, name, title, designation)
       `)
       .order('created_at', { ascending: false })
       .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);

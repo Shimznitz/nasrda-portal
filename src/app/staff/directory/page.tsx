@@ -38,7 +38,7 @@ export default function StaffTriagePage() {
       if (prof.role === 'DG' || prof.role === 'SUPER_ADMIN') {
         const [{ data: allStaff }, { data: depts }, { data: divs }, { data: unitRows }] = await Promise.all([
           supabase.from('profiles')
-            .select('id, name, email, designation, staff_no, avatar_url, role, department_id, division_id, unit_id, departments:departments!profiles_department_id_fkey(name), divisions:divisions!profiles_division_id_fkey(name), units:units!profiles_unit_id_fkey(name)')
+            .select('id, name, title, email, designation, staff_no, avatar_url, role, department_id, division_id, unit_id, departments:departments!profiles_department_id_fkey(name), divisions:divisions!profiles_division_id_fkey(name), units:units!profiles_unit_id_fkey(name)')
             .neq('id', prof.id)
             .order('name'),
           supabase.from('departments').select('id, name').order('name'),
@@ -283,7 +283,9 @@ export default function StaffTriagePage() {
                     <div className="triage-avatar">{initials(s.name)}</div>
                   )}
                   <div className="triage-info">
-                    <div className="triage-name">{s.name || 'Unnamed'}</div>
+                    <div className="triage-name">
+                      {[s.title, s.name].filter(Boolean).join(' ') || 'Unnamed'}
+                    </div>
                     <div className="triage-email">{s.email}</div>
                     <div className="triage-meta-row">
                       {s.staff_no && <span className="triage-staff-no">File No: {s.staff_no}</span>}

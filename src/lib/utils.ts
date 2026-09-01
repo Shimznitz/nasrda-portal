@@ -11,7 +11,16 @@ export function formatRole(role?: string): string {
   return role?.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) ?? '—';
 }
 
-export function getFirstName(name?: string): string {
+
+export function displayName(profile?: { title?: string | null; name?: string | null } | null): string {
+  if (!profile) return '—';
+  const parts = [profile.title, profile.name].filter(Boolean);
+  return parts.join(' ') || '—';
+}
+
+// First name with title for greetings: "Dr. John" or "John"
+export function getFirstName(name?: string | null, title?: string | null): string {
   if (!name) return 'User';
-  return name.trim().split(/\s+/)[0];
+  const firstName = name.trim().split(/\s+/)[0];
+  return title ? `${title} ${firstName}` : firstName;
 }

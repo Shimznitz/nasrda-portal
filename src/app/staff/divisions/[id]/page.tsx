@@ -1,11 +1,11 @@
-/*src/app/staff/divisions/[id]/page.tsx*/
+/* src/app/staff/divisions/[id]/page.tsx */
 
 'use client';
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
-import { initials } from '@/lib/utils';
+import { initials, displayName } from '@/lib/utils';
 import Avatar from '@/components/Avatar';
 import './division-detail.css';
 
@@ -36,7 +36,7 @@ export default function DivisionDetail() {
         .from('divisions')
         .select(`
           id, name, code, description,
-          head:profiles!divisions_head_id_fkey(id, name, designation, avatar_url),
+          head:profiles!divisions_head_id_fkey(id, name, title, designation, avatar_url),
           department:departments(id, name)
         `)
         .eq('id', id)
@@ -50,11 +50,11 @@ export default function DivisionDetail() {
         { data: projects },
       ] = await Promise.all([
         supabase.from('profiles')
-          .select('id, name, designation, role, avatar_url, unit_id, units:units!profiles_unit_id_fkey(name)')
+          .select('id, name, title, designation, role, avatar_url, unit_id, units:units!profiles_unit_id_fkey(name)')
           .eq('division_id', id as string)
           .order('name'),
         supabase.from('units')
-          .select('id, name, description, head:profiles!units_head_id_fkey(name)')
+          .select('id, name, description, head:profiles!units_head_id_fkey(id, name, title)')
           .eq('division_id', id as string)
           .order('name'),
         supabase.from('projects')
@@ -118,11 +118,11 @@ export default function DivisionDetail() {
             {data.code && <span className="dd-code">{data.code}</span>}
           </h1>
           {data.description && <p className="dd-desc">{data.description}</p>}
-          {data.head?.name && (
+          {data.head && (
             <div className="dd-head-row">
-              <Avatar avatarUrl={data.head.avatar_url} name={data.head.name} size="sm" />
+              <Avatar avatarUrl={data.head.avatar_url} name={displayName(data.head)} size="sm" />
               <div>
-                <div className="dd-head-name">{data.head.name}</div>
+                <div className="dd-head-name">{displayName(data.head)}</div>
                 <div className="dd-head-role">{data.head.designation || 'Division Head'}</div>
               </div>
             </div>
@@ -164,7 +164,7 @@ export default function DivisionDetail() {
                 <div key={u.id} className="dd-unit-row">
                   <div className="dd-unit-info">
                     <div className="dd-unit-name">{u.name}</div>
-                    <div className="dd-unit-head">{u.head?.name || 'No head assigned'}</div>
+                    <div className="dd-unit-head">{u.head ? displayName(u.head) : 'No head assigned'}</div>
                   </div>
                   <span className="dd-chip">{u.staffCount} staff</span>
                 </div>
@@ -223,9 +223,9 @@ export default function DivisionDetail() {
           <div className="dd-staff-grid">
             {data.staff.map((s: any) => (
               <div key={s.id} className="dd-staff-card">
-                <Avatar avatarUrl={s.avatar_url} name={s.name} size="md" />
+                <Avatar avatarUrl={s.avatar_url} name={displayName(s)} size="md" />
                 <div className="dd-staff-info">
-                  <div className="dd-staff-name">{s.name}</div>
+                  <div className="dd-staff-name">{displayName(s)}</div>
                   <div className="dd-staff-role">{s.designation || '—'}</div>
                   {s.units?.name && <div className="dd-staff-unit">{s.units.name}</div>}
                 </div>

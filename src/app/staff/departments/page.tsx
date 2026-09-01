@@ -3,10 +3,13 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { initials,displayName } from '@/lib/utils';
+import { useRouter } from 'next/navigation';
 import Avatar from '@/components/Avatar';
 import "./departments.css";
 
 export default function ManageDepartments() {
+  const router = useRouter();
   const [departments, setDepartments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -62,7 +65,7 @@ export default function ManageDepartments() {
       .from('departments')
       .select(`
         *,
-        profiles:head_id ( id, name, designation, staff_no, avatar_url)
+        profiles:head_id ( id, name, title, designation, staff_no, avatar_url)
       `)
       .order('created_at', { ascending: false });
     
@@ -84,7 +87,7 @@ export default function ManageDepartments() {
       setSearching(true);
       const { data } = await supabase
         .from('profiles')
-        .select('id, name, designation, staff_no, role, avatar_url')
+        .select('id, name, title, designation, staff_no, role, avatar_url')
         .ilike('name', `%${headSearch}%`)
         .limit(10);
       setSearchResults(data || []);
@@ -242,8 +245,8 @@ export default function ManageDepartments() {
               {selectedHead ? (
                 <div className="selected-head">
                   <div className="selected-head-info">
-                    <Avatar name={selectedHead.name} avatarUrl={selectedHead.avatar_url} size="md" />
-                    <div><div className="selected-name">{selectedHead.name}</div></div>
+                    <Avatar name={displayName(selectedHead)} avatarUrl={selectedHead.avatar_url} size="md" />
+                    <div><div className="selected-name">{displayName(selectedHead)}</div></div>
                   </div>
                   <button type="button" className="remove-head-btn" onClick={() => setSelectedHead(null)}>✕ Remove</button>
                 </div>
@@ -255,8 +258,8 @@ export default function ManageDepartments() {
                       {searching && <div className="search-item muted">Searching...</div>}
                       {searchResults.map(staff => (
                         <div key={staff.id} className="search-item" onClick={() => handleSelectHead(staff)}>
-                          <Avatar name={staff.name} avatarUrl={staff.avatar_url} size="sm" />
-                          <div className="search-item-info"><div className="search-name">{staff.name}</div></div>
+                          <Avatar name={displayName(staff)} avatarUrl={staff.avatar_url} size="sm" />
+                          <div className="search-item-info"><div className="search-name">{displayName(staff)}</div></div>
                         </div>
                       ))}
                     </div>
@@ -274,7 +277,7 @@ export default function ManageDepartments() {
       {loading ? <p className="loading">Loading...</p> : (
         <div className="departments-grid">
           {departments.map((dept) => (
-            <div key={dept.id} className="dept-card" onClick={() => window.location.href = `/staff/departments/${dept.id}`}>
+            <div key={dept.id} className="dept-card" onClick={() => router.push(`/staff/departments/${dept.id}`)}>
               <div className="dept-header">
                 <div className="dept-icon">{generateAcronym(dept.name)}</div>
                 <div>
@@ -284,7 +287,7 @@ export default function ManageDepartments() {
               </div>
               {dept.description && <div className="dept-description">{dept.description}</div>}
               <div className="dept-footer">
-                <div className="dept-head">{dept.profiles ? `Head: ${dept.profiles.name}` : 'No head assigned'}</div>
+                <div className="dept-head">{dept.profiles ? `Head: ${displayName(dept.profiles)}` : 'No head assigned'}</div>
                 <button className="manage-btn" onClick={(e) => openEditModal(e, dept)}>Manage</button>
               </div>
             </div>
@@ -332,9 +335,9 @@ export default function ManageDepartments() {
                   <div className="selected-head">
                     <div className="selected-head-info">
                       <div className="selected-avatar">
-                        {selectedHead.name.slice(0, 2).toUpperCase()}
+                        {displayName(selectedHead).slice(0, 2).toUpperCase()}
                       </div>
-                      <div className="selected-name">{selectedHead.name}</div>
+                      <div className="selected-name">{displayName(selectedHead)}</div>
                     </div>
                     <button
                       type="button"
@@ -361,7 +364,7 @@ export default function ManageDepartments() {
                             className="search-item"
                             onClick={() => handleSelectHead(staff)}
                           >
-                            <div className="search-name">{staff.name}</div>
+                            <div className="search-name">{displayName(staff)}</div>
                           </div>
                         ))}
                       </div>

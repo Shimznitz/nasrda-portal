@@ -4,7 +4,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
-import { initials } from '@/lib/utils';
+import { initials, displayName } from '@/lib/utils';
 import { useRouter } from "next/navigation";
 import Avatar from "@/components/Avatar";
 import "./divisions.css";
@@ -34,9 +34,9 @@ function SearchDropdown({ headSearch, setHeadSearch, searching, searchResults, o
           )}
           {searchResults.map((s: any) => (
             <div key={s.id} className="div-search-item" onClick={() => onSelect(s)}>
-              <Avatar avatarUrl={s.avatar_url} name={s.name} size="sm" />
+              <Avatar avatarUrl={s.avatar_url} name={displayName(s)} size="sm" />
               <div className="div-search-info">
-                <div className="div-search-name">{s.name}</div>
+                <div className="div-search-name">{displayName(s)}</div>
                 <div className="div-search-role">
                   {s.designation || '—'}
                   {s.division_id && s.divisions?.name && (
@@ -55,9 +55,9 @@ function SearchDropdown({ headSearch, setHeadSearch, searching, searchResults, o
 function SelectedHead({ head, onRemove }: { head: any; onRemove: () => void }) {
   return (
     <div className="div-selected-head">
-      <Avatar avatarUrl={head.avatar_url} name={head.name} size="sm" />
+      <Avatar avatarUrl={head.avatar_url} name={displayName(head)} size="sm" />
       <div className="div-selected-info">
-        <div className="div-selected-name">{head.name}</div>
+        <div className="div-selected-name">{displayName(head)}</div>
         <div className="div-selected-role">{head.designation || 'Staff Member'}</div>
       </div>
       <button className="div-remove-btn" onClick={onRemove}>✕</button>
@@ -100,7 +100,7 @@ export default function ManageDivisions() {
 
       const { data: profile } = await supabase
         .from('profiles')
-        .select('id, role, department_id')
+        .select('id, title, role, department_id')
         .eq('id', user.id)
         .single();
 
@@ -139,7 +139,7 @@ export default function ManageDivisions() {
   const loadDivisions = async (deptId: string) => {
     const { data: divs } = await supabase
       .from('divisions')
-      .select(`id, name, code, description, head:profiles!divisions_head_id_fkey(id, name, designation, avatar_url)`)
+      .select(`id, name, code, description, head:profiles!divisions_head_id_fkey(id, name, title, designation, avatar_url)`)
       .eq('department_id', deptId)
       .order('name');
 
@@ -164,7 +164,7 @@ export default function ManageDivisions() {
       setSearching(true);
       const { data } = await supabase
         .from('profiles')
-        .select('id, name, designation, avatar_url, division_id, divisions:divisions!profiles_division_id_fkey(name)')
+        .select('id, name, title, designation, avatar_url, division_id, divisions:divisions!profiles_division_id_fkey(name)')
         .ilike('name', `%${headSearch}%`)
         .eq('department_id', myDept.id)
         .limit(10);
@@ -292,7 +292,7 @@ export default function ManageDivisions() {
                 <div className="div-meta-item">
                   <span className="div-meta-label">Head</span>
                   <span className="div-meta-value">
-                    {div.head?.name || <span className="div-vacant">Vacant</span>}
+                    {div.head ? displayName(div.head) : <span className="div-vacant">Vacant</span>}
                   </span>
                 </div>
               </div>

@@ -1,13 +1,23 @@
 // src/app/staff/projects/page.tsx
-
-// src/app/staff/projects/page.tsx
-
 'use client';
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
 import "./projects.css";
+
+// Helper function to resolve dynamic display names across all profile objects
+const getDisplayName = (person: any) => {
+  if (!person) return 'Unknown';
+  
+  const rawName = person.display_name || person.full_name || person.name;
+  if (rawName && rawName.trim() !== '') {
+    const honorific = person.title ? `${person.title.trim()} ` : '';
+    return `${honorific}${rawName.trim()}`;
+  }
+  
+  return 'Unknown';
+};
 
 export default function StaffProjectsDashboard() {
   const router = useRouter();
@@ -28,7 +38,7 @@ export default function StaffProjectsDashboard() {
 
       const { data: prof } = await supabase
         .from('profiles')
-        .select('id, role, centre_id, division_id, department_id, unit_id, name')
+        .select('id, role, centre_id, division_id, department_id, unit_id, title, display_name, full_name, name')
         .eq('id', user.id)
         .single();
 
@@ -44,7 +54,7 @@ export default function StaffProjectsDashboard() {
 
       let query = supabase
         .from('projects')
-        .select('*, creator:profiles!created_by(name)')
+        .select('*, creator:profiles!created_by(id, title, display_name, full_name, name)')
         .order('created_at', { ascending: false });
 
       if (isPrivileged) {
@@ -134,8 +144,8 @@ export default function StaffProjectsDashboard() {
                 {project.due_date && (
                   <span>Due {new Date(project.due_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
                 )}
-                {project.creator?.name && (
-                  <span>By {project.creator.name}</span>
+                {project.creator && (
+                  <span>By {getDisplayName(project.creator)}</span>
                 )}
               </div>
 
@@ -172,7 +182,6 @@ function CreateProjectModal({ onClose, onSuccess, profile }: any) {
   const [teamMembers, setTeamMembers] = useState<any[]>([]);
   const [leadId, setLeadId] = useState<string | null>(null);
   
-  // State for Sub-project linking
   const [parentProjectId, setParentProjectId] = useState('');
   const [availableParents, setAvailableParents] = useState<any[]>([]);
 
@@ -180,7 +189,6 @@ function CreateProjectModal({ onClose, onSuccess, profile }: any) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
-  // Load potential parent projects on mount
   useEffect(() => {
     const loadParents = async () => {
       if (!profile?.id) return;
@@ -196,33 +204,41 @@ function CreateProjectModal({ onClose, onSuccess, profile }: any) {
   }, [profile?.id]);
 
   useEffect(() => {
-    const search = async () => {
-      if (memberSearch.length < 2) { setSearchResults([]); return; }
-      setSearching(true);
-
-      let query = supabase
-        .from('profiles')
-        .select('id, name, designation')
-        .ilike('name', `%${memberSearch}%`)
-        .neq('id', profile.id)
-        .limit(10);
-
-      if (profile.centre_id)         query = query.eq('centre_id', profile.centre_id);
-      else if (profile.division_id)   query = query.eq('division_id', profile.division_id);
-      else if (profile.department_id) query = query.eq('department_id', profile.department_id);
-      else if (profile.unit_id)       query = query.eq('unit_id', profile.unit_id);
-
-      const { data } = await query;
-      setSearchResults(data || []);
+    if (!memberSearch || memberSearch.trim().length < 2) {
+      setSearchResults([]);
       setSearching(false);
-    };
+      return;
+    }
 
-    const timeout = setTimeout(search, 300);
+    setSearching(true);
+
+    const timeout = setTimeout(async () => {
+      try {
+        const term = `%${memberSearch}%`;
+        let query = supabase
+          .from('profiles')
+          .select('id, title, display_name, full_name, name, designation')
+          .or(`display_name.ilike.${term},full_name.ilike.${term},name.ilike.${term}`)
+          .neq('id', profile.id)
+          .limit(10);
+
+        if (profile.centre_id)         query = query.eq('centre_id', profile.centre_id);
+        else if (profile.division_id)   query = query.eq('division_id', profile.division_id);
+        else if (profile.department_id) query = query.eq('department_id', profile.department_id);
+        else if (profile.unit_id)       query = query.eq('unit_id', profile.unit_id);
+
+        const { data } = await query;
+        setSearchResults(data || []);
+      } finally {
+        setSearching(false);
+      }
+    }, 300);
+
     return () => clearTimeout(timeout);
   }, [memberSearch, profile]);
 
   const addMember = (staff: any) => {
-    if (!teamMembers.some((m) => m.id === staff.id)) {
+    if (staff.id !== profile.id && !teamMembers.some((m) => m.id === staff.id)) {
       setTeamMembers((prev) => [...prev, staff]);
     }
     setMemberSearch('');
@@ -232,6 +248,18 @@ function CreateProjectModal({ onClose, onSuccess, profile }: any) {
   const removeMember = (id: string) => {
     setTeamMembers((prev) => prev.filter((m) => m.id !== id));
     if (leadId === id) setLeadId(null);
+  };
+
+  const getInitials = (person: any) => {
+    const name = person.display_name || person.full_name || person.name || 'Unknown';
+    
+    return name
+      .split(' ')
+      .filter(Boolean)
+      .map((n: string) => n[0])
+      .slice(0, 2)
+      .join('')
+      .toUpperCase();
   };
 
   const createProject = async () => {
@@ -266,15 +294,25 @@ function CreateProjectModal({ onClose, onSuccess, profile }: any) {
       return;
     }
 
-    // Insert members (creator is always added)
-    const memberRows = [
-      { project_id: newProject.id, profile_id: profile.id, is_lead: !leadId || leadId === profile.id },
+    // Deduplicate member IDs to protect unique primary keys
+    const rawMembers = [
+      { profile_id: profile.id, is_lead: !leadId || leadId === profile.id },
       ...teamMembers.map((m) => ({
-        project_id: newProject.id,
         profile_id: m.id,
         is_lead: m.id === leadId,
       })),
     ];
+
+    const uniqueMemberMap = new Map();
+    rawMembers.forEach((m) => {
+      uniqueMemberMap.set(m.profile_id, {
+        project_id: newProject.id,
+        profile_id: m.profile_id,
+        is_lead: m.is_lead,
+      });
+    });
+
+    const memberRows = Array.from(uniqueMemberMap.values());
 
     await supabase.from('project_members').insert(memberRows);
     onSuccess();
@@ -321,7 +359,7 @@ function CreateProjectModal({ onClose, onSuccess, profile }: any) {
           />
         </div>
 
-        <div className="form-group" style={{ position: 'relative' }}>
+        <div className="form-group" style={{ position: 'relative', zIndex: 10 }}>
           <label>Add Team Members</label>
           <input
             type="text"
@@ -340,10 +378,10 @@ function CreateProjectModal({ onClose, onSuccess, profile }: any) {
               {searchResults.map((staff) => (
                 <div key={staff.id} className="search-item" onClick={() => addMember(staff)}>
                   <div className="search-avatar">
-                    {staff.name?.split(' ').map((n: string) => n[0]).slice(0, 2).join('').toUpperCase()}
+                    {getInitials(staff)}
                   </div>
                   <div className="search-item-info">
-                    <div className="search-name">{staff.name}</div>
+                    <div className="search-name">{getDisplayName(staff)}</div>
                     <div className="search-designation">{staff.designation}</div>
                   </div>
                   <span className="add-label">+ Add</span>
@@ -360,10 +398,10 @@ function CreateProjectModal({ onClose, onSuccess, profile }: any) {
               {teamMembers.map((m) => (
                 <div key={m.id} className="member-row">
                   <div className="search-avatar">
-                    {m.name?.split(' ').map((n: string) => n[0]).slice(0, 2).join('').toUpperCase()}
+                    {getInitials(m)}
                   </div>
                   <div className="member-info">
-                    <div className="search-name">{m.name}</div>
+                    <div className="search-name">{getDisplayName(m)}</div>
                     <div className="search-designation">{m.designation}</div>
                   </div>
                   <button
@@ -380,7 +418,6 @@ function CreateProjectModal({ onClose, onSuccess, profile }: any) {
           </div>
         )}
 
-        {/* Parent Project Selector */}
         {availableParents.length > 0 && (
           <div className="form-group">
             <label>Link to Parent Project (optional)</label>

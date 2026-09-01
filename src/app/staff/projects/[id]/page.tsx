@@ -46,6 +46,21 @@ const PRIORITY_CLASS: Record<string, string> = {
   URGENT: 'priority-urgent',
 };
 
+function getDisplayName(
+  user: { title?: string | null; full_name?: string | null; name?: string | null; email?: string | null } | null | undefined
+): string {
+  if (!user) return 'Unknown User';
+  
+  const rawName = user.full_name || user.name;
+  if (rawName && rawName.trim() !== '') {
+    const honorific = user.title ? `${user.title.trim()} ` : '';
+    return `${honorific}${rawName.trim()}`;
+  }
+  
+  if (user.email) return user.email.split('@')[0];
+  return 'Unassigned';
+}
+
 export default function ProjectDetail() {
   const { id } = useParams();
   const router = useRouter();
@@ -73,7 +88,7 @@ export default function ProjectDetail() {
       if (!user) return;
 
       const { data: prof } = await supabase
-        .from('profiles').select('id, name, designation, role').eq('id', user.id).single();
+        .from('profiles').select('id, title, name, designation, role').eq('id', user.id).single();
       setCurrentUser(prof);
 
       const { data: proj } = await supabase
@@ -85,7 +100,7 @@ export default function ProjectDetail() {
 
       const { data: memberRows } = await supabase
         .from('project_members')
-        .select('profile_id, is_lead, profiles(id, name, designation, avatar_url)')
+        .select('profile_id, is_lead, profiles(id, title, name, designation, avatar_url)')
         .eq('project_id', id);
       setMembers(memberRows || []);
 
@@ -93,9 +108,9 @@ export default function ProjectDetail() {
       let taskQuery = supabase
         .from('tasks')
         .select(`
-          id, title, description, status, due_date, priority,
+          id, description, status, due_date, priority,
           assigned_to, assigned_by, completed_at, created_at,
-          assignee:profiles!assigned_to(id, name, designation)
+          assignee:profiles!assigned_to(id, title, name, designation)
         `)
         .eq('project_id', id)
         .order('created_at', { ascending: true });
@@ -117,7 +132,7 @@ export default function ProjectDetail() {
               id, file_name, file_url, status, created_at,
               file_route_recipients(
                 id, profile_id, status, opened_at,
-                profile:profiles(name, designation)
+                profile:profiles(title, name, designation)
               )
             `)
             .eq('task_id', task.id),
@@ -780,7 +795,7 @@ function FileRouteModal({ task, currentUser, projectLink, onSuccess, onClose }: 
       // Search ALL staff — routing is open to anyone
       const { data } = await supabase
         .from('profiles')
-        .select('id, name, designation, department:departments!profiles_department_id_fkey(name)')
+        .select('id, title, name, designation, department:departments!profiles_department_id_fkey(name)')
         .ilike('name', `%${staffSearch}%`)
         .neq('id', currentUser.id)
         .limit(12);
@@ -990,15 +1005,15 @@ function RouteDetailModal({ route, task, currentUser, onClose, onSuccess, projec
     const [{ data: r }, { data: ev }] = await Promise.all([
       supabase.from('file_routes').select(`
         *,
-        creator:profiles!created_by(id, name, designation, avatar_url),
+        creator:profiles!created_by(id, title, name, designation, avatar_url),
         file_route_recipients(
           id, profile_id, status, opened_at, completed_at,
-          profile:profiles(id, name, designation, avatar_url),
+          profile:profiles(id, title, name, designation, avatar_url),
           adder:profiles!added_by(name)
         )
       `).eq('id', route.id).single(),
       supabase.from('file_route_events').select(`
-        *, actor:profiles!actor_id(name, designation),
+        *, actor:profiles!actor_id(title, name, designation),
         forwarded_to_profile:profiles!forwarded_to(name)
       `).eq('route_id', route.id).order('created_at', { ascending: true }),
     ]);
@@ -1036,7 +1051,7 @@ function RouteDetailModal({ route, task, currentUser, onClose, onSuccess, projec
     const search = async () => {
       if (forwardSearch.length < 2) { setForwardResults([]); return; }
       const { data } = await supabase.from('profiles')
-        .select('id, name, designation')
+        .select('id, title, name, designation')
         .ilike('name', `%${forwardSearch}%`)
         .neq('id', currentUser.id)
         .limit(10);
@@ -1374,7 +1389,7 @@ function EditProjectModal({ project, members, currentUser, onClose, onSuccess, o
     const search = async () => {
       if (memberSearch.length < 2) { setSearchResults([]); return; }
       const { data } = await supabase.from('profiles')
-        .select('id, name, designation')
+        .select('id, title, name, designation')
         .ilike('name', `%${memberSearch}%`).limit(8);
       setSearchResults(data || []);
     };

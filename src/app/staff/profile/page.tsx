@@ -57,6 +57,12 @@ const SKILLS_LIST = [
   'Cybersecurity',
 ];
 
+// Helper function to render formatted user title + name cleanly
+function getDisplayName(prof: any) {
+  if (!prof) return '';
+  return [prof.title, prof.name].filter(Boolean).join(' ');
+}
+
 export default function ProfilePage() {
   const [profile, setProfile]           = useState<any>(null);
   const [loading, setLoading]           = useState(true);
@@ -78,15 +84,16 @@ export default function ProfilePage() {
 
   // Edit form
   const [editForm, setEditForm] = useState({
-    name:           '',
-    staff_no:       '',
-    designation:    '',
-    degree_level:   '',
+    title:           '',
+    name:            '',
+    staff_no:        '',
+    designation:     '',
+    degree_level:    '',
     course_of_study: '',
-    qualification:  '',
-    whatsapp:       '',
-    bio:            '',
-    skills:         [] as string[],
+    qualification:   '',
+    whatsapp:        '',
+    bio:             '',
+    skills:          [] as string[],
   });
 
   // Avatar
@@ -98,106 +105,100 @@ export default function ProfilePage() {
   useEffect(() => { loadProfile(); }, []);
 
   const loadProfile = async () => {
-  try {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
 
-    const { data: prof } = await supabase
-      .from('profiles').select('*').eq('id', user.id).single();
-    if (!prof) return;
+      const { data: prof } = await supabase
+        .from('profiles').select('*').eq('id', user.id).single();
+      if (!prof) return;
 
-    setProfile(prof);
-    setEditForm({
-      name:            prof.name            || '',
-      staff_no:        prof.staff_no        || '',
-      designation:     prof.designation     || '',
-      degree_level:    prof.degree_level    || '',
-      course_of_study: prof.course_of_study || '',
-      qualification:   prof.qualification   || '',
-      whatsapp:        prof.whatsapp        || '',
-      bio:             prof.bio             || '',
-      skills:          prof.skills          || [],
-    });
+      setProfile(prof);
+      setEditForm({
+        title:           prof.title           || '',
+        name:            prof.name            || '',
+        staff_no:        prof.staff_no        || '',
+        designation:     prof.designation     || '',
+        degree_level:    prof.degree_level    || '',
+        course_of_study: prof.course_of_study || '',
+        qualification:   prof.qualification   || '',
+        whatsapp:        prof.whatsapp        || '',
+        bio:             prof.bio             || '',
+        skills:          prof.skills          || [],
+      });
 
-    // Fetch org names
-    const names: any = {};
-    if (prof.department_id) {
-      const { data } = await supabase.from('departments').select('name').eq('id', prof.department_id).maybeSingle();
-      if (data) names.department = data.name;
-    }
-    if (prof.division_id) {
-      const { data } = await supabase.from('divisions').select('name').eq('id', prof.division_id).maybeSingle();
-      if (data) names.division = data.name;
-    }
-    if (prof.unit_id) {
-      const { data } = await supabase.from('units').select('name').eq('id', prof.unit_id).maybeSingle();
-      if (data) names.unit = data.name;
-    }
-    if (prof.centre_id) {
-      const { data } = await supabase.from('centres').select('name').eq('id', prof.centre_id).maybeSingle();
-      if (data) names.centre = data.name;
-    }
-    setOrgNames(names);
-
-    // ── Refactored Stats calculation ──
-
-    // 1. Fetch user's assigned project IDs
-    const { data: memberships } = await supabase
-      .from('project_members')
-      .select('project_id')
-      .eq('profile_id', user.id);
-
-    const projectIds = memberships?.map((m: any) => m.project_id) || [];
-
-    // 2. Fetch all tasks assigned directly to this user
-    const { data: tasks } = await supabase
-      .from('tasks')
-      .select('id, status, approval_status, is_approved')
-      .eq('assigned_to', user.id);
-
-    const totalAssignedTasks = tasks?.length || 0;
-
-    // Count open tasks (tasks assigned that are not complete)
-    const openTasksCount = tasks 
-      ? tasks.filter(t => t.status !== 'COMPLETED' && t.status !== 'completed' && t.status !== 'DONE').length 
-      : 0;
-
-    // 3. Calculate Avg Completion based on Head approval vs assigned tasks
-    let avgCompletion = 0;
-
-    if (totalAssignedTasks > 0) {
-      // Primary calculation: Tasks that are completed AND approved by Head
-      const approvedCompletedTasks = tasks!.filter(t => {
-        const isDone = t.status === 'COMPLETED' || t.status === 'completed' || t.status === 'DONE';
-        const isApproved = t.approval_status === 'APPROVED' || t.approval_status === 'approved' || t.is_approved === true;
-        
-        return isDone && isApproved;
-      }).length;
-
-      avgCompletion = Math.round((approvedCompletedTasks / totalAssignedTasks) * 100);
-    } else if (projectIds.length > 0) {
-      // Fallback: Average progress across assigned projects if no direct tasks exist yet
-      const { data: projects } = await supabase
-        .from('projects')
-        .select('progress')
-        .in('id', projectIds);
-
-      if (projects && projects.length > 0) {
-        const totalProgressSum = projects.reduce((acc, p) => acc + (p.progress ?? 0), 0);
-        avgCompletion = Math.round(totalProgressSum / projects.length);
+      // Fetch org names
+      const names: any = {};
+      if (prof.department_id) {
+        const { data } = await supabase.from('departments').select('name').eq('id', prof.department_id).maybeSingle();
+        if (data) names.department = data.name;
       }
+      if (prof.division_id) {
+        const { data } = await supabase.from('divisions').select('name').eq('id', prof.division_id).maybeSingle();
+        if (data) names.division = data.name;
+      }
+      if (prof.unit_id) {
+        const { data } = await supabase.from('units').select('name').eq('id', prof.unit_id).maybeSingle();
+        if (data) names.unit = data.name;
+      }
+      if (prof.centre_id) {
+        const { data } = await supabase.from('centres').select('name').eq('id', prof.centre_id).maybeSingle();
+        if (data) names.centre = data.name;
+      }
+      setOrgNames(names);
+
+      // ── Stats calculation ──
+      const { data: memberships } = await supabase
+        .from('project_members')
+        .select('project_id')
+        .eq('profile_id', user.id);
+
+      const projectIds = memberships?.map((m: any) => m.project_id) || [];
+
+      const { data: tasks } = await supabase
+        .from('tasks')
+        .select('id, status, approval_status, is_approved')
+        .eq('assigned_to', user.id);
+
+      const userTasks = tasks || [];
+      const totalAssignedTasks = userTasks.length;
+
+      const openTasksCount = userTasks.filter(t => 
+        t.status !== 'COMPLETED' && t.status !== 'completed' && t.status !== 'DONE'
+      ).length;
+
+      let avgCompletion = 0;
+
+      if (totalAssignedTasks > 0) {
+        const approvedCompletedTasks = userTasks.filter(t => {
+          const isDone = t.status === 'COMPLETED' || t.status === 'completed' || t.status === 'DONE';
+          const isApproved = t.approval_status === 'APPROVED' || t.approval_status === 'approved' || t.is_approved === true;
+          return isDone && isApproved;
+        }).length;
+
+        avgCompletion = Math.round((approvedCompletedTasks / totalAssignedTasks) * 100);
+      } else if (projectIds.length > 0) {
+        const { data: projects } = await supabase
+          .from('projects')
+          .select('progress')
+          .in('id', projectIds);
+
+        if (projects && projects.length > 0) {
+          const totalProgressSum = projects.reduce((acc, p) => acc + (p.progress ?? 0), 0);
+          avgCompletion = Math.round(totalProgressSum / projects.length);
+        }
+      }
+
+      setStats({
+        totalProjects: projectIds.length,
+        openTasks: openTasksCount,
+        avgCompletion: avgCompletion,
+      });
+
+    } finally {
+      setLoading(false);
     }
-
-    setStats({
-      totalProjects: projectIds.length,
-      openTasks: openTasksCount,
-      avgCompletion: avgCompletion,
-    });
-
-  } finally {
-    setLoading(false);
-  }
-};
+  };
 
   const handleSave = async () => {
     if (!profile) return;
@@ -206,12 +207,12 @@ export default function ProfilePage() {
     const whatsapp = editForm.whatsapp.replace(/\s/g, '');
     const cleanStaffNo = editForm.staff_no.trim().toUpperCase();
 
-    // Build qualification string from degree + course
     const qualStr = editForm.degree_level && editForm.course_of_study
       ? `${editForm.degree_level} ${editForm.course_of_study}`
       : editForm.qualification || null;
 
     const { error } = await supabase.from('profiles').update({
+      title:           editForm.title               || null,
       name:            editForm.name.trim()         || null,
       staff_no:        cleanStaffNo                 || null,
       designation:     editForm.designation.trim()    || null,
@@ -248,7 +249,6 @@ export default function ProfilePage() {
     if (error) {
       setAuthError(error.message);
     } else {
-      // Also update profiles table
       await supabase.from('profiles').update({ email: newEmail.trim() }).eq('id', profile.id);
       setAuthSuccess(`Confirmation sent to ${newEmail}. Check your inbox to confirm the change.`);
       setNewEmail('');
@@ -366,7 +366,7 @@ export default function ProfilePage() {
         </div>
 
         <div className="pf-header-info">
-          <h1 className="pf-name">{profile.name}</h1>
+          <h1 className="pf-name">{getDisplayName(profile)}</h1>
           {profile.designation && <p className="pf-designation">{profile.designation}</p>}
           {profile.staff_no    && <p className="pf-staffno">{profile.staff_no}</p>}
           <div className="pf-role-badge">{fmt(profile.role)}</div>
@@ -383,7 +383,6 @@ export default function ProfilePage() {
           )}
           {profile.bio && <p className="pf-bio">{profile.bio}</p>}
 
-          {/* Org breadcrumb */}
           <div className="pf-org-row">
             {orgNames.department && <span className="pf-org-chip">🏛 {orgNames.department}</span>}
             {orgNames.division   && <span className="pf-org-chip">▧ {orgNames.division}</span>}
@@ -415,12 +414,31 @@ export default function ProfilePage() {
           {editing ? (
             <div className="pf-edit-form">
 
-              <div className="pf-form-group">
-                <label>Full Name *</label>
-                <input className="pf-input" value={editForm.name}
-                  onChange={e => setEditForm({ ...editForm, name: e.target.value })}
-                  placeholder="e.g. Napiya Halimat Darasimi"/>
+              <div className="pf-form-row">
+                <div className="pf-form-group" style={{ flex: '0 0 120px' }}>
+                  <label>Title</label>
+                  <select 
+                    className="pf-input" 
+                    value={editForm.title}
+                    onChange={e => setEditForm({ ...editForm, title: e.target.value })}
+                  >
+                    <option value="">None</option>
+                    {['Mr','Mrs','Miss','Ms','Dr','Prof','Engr','Barr','Bldr','Arc','Pharm','Nurse','Cdr','Maj','Col','Brig','Gen','Air Vice Marshal','Rtd'].map(t => (
+                      <option key={t} value={t}>{t}</option>
+                    ))}
+                  </select>
                 </div>
+
+                <div className="pf-form-group" style={{ flex: 1 }}>
+                  <label>Full Name *</label>
+                  <input 
+                    className="pf-input" 
+                    value={editForm.name}
+                    onChange={e => setEditForm({ ...editForm, name: e.target.value })}
+                    placeholder="e.g. Napiya Halimat Darasimi"
+                  />
+                </div>
+              </div>
 
               <div className="pf-form-group">
                 <label>Staff File Number (PF No.)</label>

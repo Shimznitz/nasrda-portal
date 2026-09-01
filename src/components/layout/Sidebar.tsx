@@ -4,6 +4,7 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { displayName } from '@/lib/utils';
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import Image from "next/image";
@@ -221,7 +222,7 @@ export default function Sidebar() {
         <div className="user-info">
           <Avatar name={profile?.name} avatarUrl={profile?.avatar_url} size="sm" />
           <div className="user-details">
-            <div className="user-name">{name}</div>
+            <div className="user-name">{displayName(profile)}</div>
             <div className="user-staffno">
               {profile?.staff_no || formatRole(profile?.role || '')}
             </div>

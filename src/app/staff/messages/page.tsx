@@ -2,11 +2,14 @@
 
 'use client';
 
-import { useEffect, useState, useRef, useCallback } from "react";
+import { useEffect, useState, useRef } from "react";
 import { supabase } from "@/lib/supabase";
-import { initials } from '@/lib/utils';
 import Avatar from "@/components/Avatar";
+import { displayName, formatRole, getFirstName } from "@/lib/utils";
 import "./messages.css";
+
+// Select string updated to match existing columns in 'profiles'
+const PROFILE_SELECT = 'id, name, staff_no, email, title, designation, role, avatar_url';
 
 export default function MessagesPage() {
   const [profile, setProfile] = useState<any>(null);
@@ -24,6 +27,11 @@ export default function MessagesPage() {
   const activeConvRef = useRef<any>(null);
   const pollingRef = useRef<any>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const getRole = (person: any) => {
+    const rawRole = person?.designation || person?.role;
+    return rawRole ? formatRole(rawRole) : '';
+  };
 
   useEffect(() => {
     const load = async () => {
@@ -66,7 +74,7 @@ export default function MessagesPage() {
     if (ids.size === 0) return;
 
     const [{ data: convProfiles }, { data: unreadMsgs }] = await Promise.all([
-      supabase.from('profiles').select('id, name, designation, role').in('id', Array.from(ids)),
+      supabase.from('profiles').select(PROFILE_SELECT).in('id', Array.from(ids)),
       supabase.from('messages')
         .select('sender_id')
         .eq('receiver_id', userId)
@@ -99,18 +107,30 @@ export default function MessagesPage() {
     setUnreadCounts(prev => ({ ...prev, [otherId]: 0 }));
   };
 
+  // Fixed: Search using valid table columns (name, email, staff_no)
   useEffect(() => {
     const doSearch = async () => {
-      if (search.length < 2) { setSearchResults([]); return; }
-      const { data } = await supabase
+      const query = search.trim();
+      if (query.length < 1) { setSearchResults([]); return; }
+
+      const myId = profileRef.current?.id;
+      
+      const { data, error } = await supabase
         .from('profiles')
-        .select('id, name, designation, avatar_url')
-        .ilike('name', `%${search}%`)
-        .neq('id', profileRef.current?.id || '')
-        .limit(8);
-      setSearchResults(data || []);
+        .select(PROFILE_SELECT)
+        .or(`name.ilike.%${query}%,email.ilike.%${query}%,staff_no.ilike.%${query}%`)
+        .limit(10);
+
+      if (error) {
+        console.error('Search query error:', error);
+        return;
+      }
+
+      const filtered = (data || []).filter((p: any) => p.id !== myId);
+      setSearchResults(filtered);
     };
-    const t = setTimeout(doSearch, 300);
+
+    const t = setTimeout(doSearch, 250);
     return () => clearTimeout(t);
   }, [search]);
 
@@ -158,11 +178,6 @@ export default function MessagesPage() {
   const formatTime = (iso: string) =>
     new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-  const formatConvTime = (conv: any) => {
-    // Could be enriched with last message time — left for future
-    return conv.designation || '';
-  };
-
   const totalUnread = Object.values(unreadCounts).reduce((a: number, b) => a + (b as number), 0);
 
   return (
@@ -178,7 +193,7 @@ export default function MessagesPage() {
             <input
               type="text"
               className="msg-input"
-              placeholder="Search people…"
+              placeholder="Search people, staff no, email…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
@@ -186,16 +201,16 @@ export default function MessagesPage() {
               <div className="msg-search-results">
                 {searchResults.map((s: any) => (
                   <div key={s.id} className="msg-search-item" onClick={() => startConversation(s)}>
-                    <Avatar name={s.name} avatarUrl={s.avatar_url} size="md" />
+                    <Avatar name={displayName(s)} avatarUrl={s.avatar_url} size="md" />
                     <div className="msg-search-info">
-                      <div className="msg-search-name">{s.name}</div>
-                      <div className="msg-search-role">{s.designation}</div>
+                      <div className="msg-search-name">{displayName(s)}</div>
+                      <div className="msg-search-role">{getRole(s)}</div>
                     </div>
                   </div>
                 ))}
               </div>
             )}
-            {search.length >= 2 && searchResults.length === 0 && (
+            {search.trim().length >= 1 && searchResults.length === 0 && (
               <div className="msg-search-results">
                 <div className="msg-search-empty">No results found</div>
               </div>
@@ -214,14 +229,14 @@ export default function MessagesPage() {
                 onClick={() => startConversation(c)}
               >
                 <div className="msg-avatar-wrap">
-                  <Avatar name={c.name} avatarUrl={c.avatar_url} size="md" />
+                  <Avatar name={displayName(c)} avatarUrl={c.avatar_url} size="md" />
                   {(unreadCounts[c.id] || 0) > 0 && (
                     <div className="msg-conv-badge">{unreadCounts[c.id]}</div>
                   )}
                 </div>
                 <div className="msg-conv-info">
-                  <div className="msg-conv-name">{c.name}</div>
-                  <div className="msg-conv-role">{c.designation}</div>
+                  <div className="msg-conv-name">{displayName(c)}</div>
+                  <div className="msg-conv-role">{getRole(c)}</div>
                 </div>
               </div>
             ))
@@ -239,10 +254,10 @@ export default function MessagesPage() {
         ) : (
           <>
             <div className="msg-chat-header">
-              <Avatar name={activeConv.name} avatarUrl={activeConv.avatar_url} size="md" />
+              <Avatar name={displayName(activeConv)} avatarUrl={activeConv.avatar_url} size="md" />
               <div className="msg-chat-header-info">
-                <div className="msg-chat-name">{activeConv.name}</div>
-                <div className="msg-chat-role">{activeConv.designation}</div>
+                <div className="msg-chat-name">{displayName(activeConv)}</div>
+                <div className="msg-chat-role">{getRole(activeConv)}</div>
               </div>
             </div>
 
@@ -282,7 +297,7 @@ export default function MessagesPage() {
                 ref={inputRef}
                 type="text"
                 className="msg-input msg-compose"
-                placeholder={`Message ${activeConv.name.split(' ')[0]}…`}
+                placeholder={`Message ${getFirstName(activeConv.name, activeConv.title)}…`}
                 value={newMsg}
                 onChange={(e) => setNewMsg(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) sendMessage(); }}
