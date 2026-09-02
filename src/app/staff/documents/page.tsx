@@ -3,7 +3,7 @@
 
 import { useEffect, useState, useMemo, Suspense, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
-import { initials } from '@/lib/utils';
+import { initials, displayName } from '@/lib/utils';
 import './documents.css';
 import Avatar from '@/components/Avatar';
 import { useSearchParams } from 'next/navigation';
@@ -11,10 +11,12 @@ import { useSearchParams } from 'next/navigation';
 // ── TypeScript Types ──
 interface Profile {
   id?: string;
+  title?: string | null;
   name?: string | null;
   email?: string | null;
   designation?: string | null;
   avatar_url?: string | null;
+  drive_folder_url?: string | null;
 }
 
 interface FileRouteRecipient {
@@ -46,6 +48,7 @@ interface FileRoute {
   id: string;
   file_name: string;
   file_url: string;
+  drive_url?: string | null;
   status: string;
   created_at: string;
   task_id?: string | null;
@@ -57,10 +60,21 @@ interface FileRoute {
   task?: TaskInfo | null;
 }
 
-// Helper to reliably compute a displayable user name
-function getDisplayName(profile: Profile | null | undefined): string {
+interface UserReport {
+  id: string;
+  profile_id: string;
+  recipient_id?: string | null;
+  period_type: string;
+  summary_markdown: string;
+  created_at: string;
+  profile?: Profile | null;
+}
+
+// Format fallback for profiles missing names
+function getProfileDisplayName(profile: Profile | null | undefined): string {
   if (!profile) return 'Unknown User';
-  if (profile.name && profile.name.trim() !== '') return profile.name;
+  const name = displayName(profile);
+  if (name !== '—') return name;
   if (profile.email) return profile.email.split('@')[0];
   return 'Unknown User';
 }
@@ -71,12 +85,20 @@ const formatTimeShort = (iso: string) =>
 
 function DocumentsContent() {
   const [userId, setUserId] = useState('');
+  const [userProfile, setUserProfile] = useState<Profile | null>(null);
   const [routes, setRoutes] = useState<FileRoute[]>([]);
+  const [userReports, setUserReports] = useState<UserReport[]>([]);
+  const [selectedReport, setSelectedReport] = useState<UserReport | null>(null);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [filter, setFilter] = useState<'all' | 'created' | 'received' | 'action'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [expanded, setExpanded] = useState<string | null>(null);
+  
+  // Modal state for linking individual Drive folder
+  const [driveUrlInput, setDriveUrlInput] = useState('');
+  const [savingDrive, setSavingDrive] = useState(false);
+  const [showDriveModal, setShowDriveModal] = useState(false);
 
   const searchParams = useSearchParams();
   const highlightRouteId = searchParams.get('route');
@@ -86,22 +108,21 @@ function DocumentsContent() {
     setErrorMsg(null);
 
     const selectStr = `
-      id, file_name, file_url, status, created_at, task_id, created_by,
-      creator:profiles!created_by(id, name, designation, avatar_url),
+      id, file_name, file_url, drive_url, status, created_at, task_id, created_by,
+      creator:profiles!created_by(id, title, name, designation, avatar_url, drive_folder_url),
       file_route_recipients(
         id, profile_id, status, opened_at, completed_at, added_by,
-        profile:profiles!profile_id(name, designation, avatar_url)
+        profile:profiles!profile_id(id, title, name, designation, avatar_url, drive_folder_url)
       ),
       file_route_events(
         id, action, note, created_at, forwarded_to,
-        actor:profiles!actor_id(name, designation),
-        forwarded_to_profile:profiles!forwarded_to(name)
+        actor:profiles!actor_id(title, name, designation),
+        forwarded_to_profile:profiles!forwarded_to(title, name)
       )
     `;
 
     try {
-      // 1. Parallel fetch: Created routes & Recipient rows
-      const [createdRes, recipRowsRes] = await Promise.all([
+      const [createdRes, recipRowsRes, userProfRes, reportsRes] = await Promise.all([
         supabase
           .from('file_routes')
           .select(selectStr)
@@ -111,16 +132,27 @@ function DocumentsContent() {
           .from('file_route_recipients')
           .select('route_id')
           .eq('profile_id', uid),
+        supabase
+          .from('profiles')
+          .select('id, title, name, email, designation, avatar_url, drive_folder_url')
+          .eq('id', uid)
+          .single(),
+        supabase
+          .from('user_reports')
+          .select('*, profile:profiles!user_reports_profile_id_fkey(id, title, name, email)')
+          .or(`profile_id.eq.${uid},recipient_id.eq.${uid}`)
+          .order('created_at', { ascending: false }),
       ]);
 
       if (createdRes.error) throw createdRes.error;
       if (recipRowsRes.error) throw recipRowsRes.error;
+      if (userProfRes.data) setUserProfile(userProfRes.data);
+      if (reportsRes.data) setUserReports(reportsRes.data as UserReport[]);
 
       const created = (createdRes.data as unknown as FileRoute[]) || [];
       const receivedIds = (recipRowsRes.data || []).map((r) => r.route_id);
       let received: FileRoute[] = [];
 
-      // 2. Fetch received routes if any exist
       if (receivedIds.length > 0) {
         const { data: receivedData, error: receivedErr } = await supabase
           .from('file_routes')
@@ -132,7 +164,6 @@ function DocumentsContent() {
         received = (receivedData as unknown as FileRoute[]) || [];
       }
 
-      // 3. Merge and assign roles
       const createdMap = new Set(created.map((r) => r.id));
       const seen = new Set<string>();
 
@@ -148,7 +179,6 @@ function DocumentsContent() {
         return true;
       });
 
-      // 4. Enrich task & project details
       const taskIds = [...new Set(allRoutes.filter((r) => r.task_id).map((r) => r.task_id!))];
       let taskMap: Record<string, TaskInfo> = {};
 
@@ -179,7 +209,7 @@ function DocumentsContent() {
             title: t.title,
             project_title: t.project_id ? (projectMap[t.project_id] || null) : null,
           };
-          });
+        });
       }
 
       const enriched = allRoutes
@@ -208,6 +238,29 @@ function DocumentsContent() {
     return () => { mounted = false; };
   }, [fetchRoutes]);
 
+  // Save/Update Google Drive Folder Link for current user
+  const handleSaveDriveUrl = async () => {
+    if (!driveUrlInput.trim()) return;
+    setSavingDrive(true);
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ drive_folder_url: driveUrlInput.trim() })
+        .eq('id', userId);
+
+      if (error) throw error;
+
+      setUserProfile((prev) => prev ? { ...prev, drive_folder_url: driveUrlInput.trim() } : null);
+      setShowDriveModal(false);
+      setDriveUrlInput('');
+    } catch (err) {
+      console.error('Failed to save Drive URL:', err);
+      alert('Could not update Drive URL. Please try again.');
+    } finally {
+      setSavingDrive(false);
+    }
+  };
+
   const markOpened = async (routeId: string) => {
     const routeIndex = routes.findIndex((r) => r.id === routeId);
     if (routeIndex === -1) return;
@@ -219,7 +272,6 @@ function DocumentsContent() {
       const now = new Date().toISOString();
       const previousRoutes = [...routes];
 
-      // Optimistic update
       setRoutes((prev) => {
         const copy = [...prev];
         const target = { ...copy[routeIndex] };
@@ -246,7 +298,7 @@ function DocumentsContent() {
         });
       } catch (err) {
         console.error('Failed to mark file as opened:', err);
-        setRoutes(previousRoutes); // Rollback on failure
+        setRoutes(previousRoutes);
       }
     }
   };
@@ -260,7 +312,6 @@ function DocumentsContent() {
     const now = new Date().toISOString();
     const previousRoutes = [...routes];
 
-    // Optimistic update
     setRoutes((prev) =>
       prev.map((r) => {
         if (r.id !== routeId) return r;
@@ -298,11 +349,10 @@ function DocumentsContent() {
       });
     } catch (err) {
       console.error('Failed to mark file as done:', err);
-      setRoutes(previousRoutes); // Rollback on failure
+      setRoutes(previousRoutes);
     }
   };
 
-  // ── Metrics Counters ──
   const createdCount = useMemo(() => routes.filter((r) => r._role === 'created').length, [routes]);
   const receivedCount = useMemo(() => routes.filter((r) => r._role === 'received').length, [routes]);
   const actionCount = useMemo(
@@ -314,7 +364,6 @@ function DocumentsContent() {
     [routes, userId]
   );
 
-  // ── Search & Filter Logic ──
   const visible = useMemo(() => {
     return routes.filter((r) => {
       const myRec = r.file_route_recipients?.find((rc) => rc.profile_id === userId);
@@ -330,9 +379,9 @@ function DocumentsContent() {
       const fileNameMatch = r.file_name?.toLowerCase().includes(q);
       const taskTitleMatch = r.task?.title?.toLowerCase().includes(q);
       const projectTitleMatch = r.task?.project_title?.toLowerCase().includes(q);
-      const creatorMatch = getDisplayName(r.creator).toLowerCase().includes(q);
+      const creatorMatch = getProfileDisplayName(r.creator).toLowerCase().includes(q);
       const recipientMatch = r.file_route_recipients?.some((rc) =>
-        getDisplayName(rc.profile).toLowerCase().includes(q)
+        getProfileDisplayName(rc.profile).toLowerCase().includes(q)
       );
 
       return fileNameMatch || taskTitleMatch || projectTitleMatch || creatorMatch || recipientMatch;
@@ -360,10 +409,128 @@ function DocumentsContent() {
 
   return (
     <div className="docs-page">
-      <div className="docs-header">
-        <h1 className="docs-title">Documents</h1>
-        <p className="docs-sub">File routing and chain-of-custody tracker</p>
+      <div className="docs-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div>
+          <h1 className="docs-title">Documents</h1>
+          <p className="docs-sub">File routing and chain-of-custody tracker</p>
+        </div>
+        
+        {/* Button to manage Google Drive folder link */}
+        <button 
+          className="docs-action-btn"
+          style={{ background: 'var(--bg-input, #222)', border: '1px solid #444', padding: '8px 14px', borderRadius: '6px' }}
+          onClick={() => {
+            setDriveUrlInput(userProfile?.drive_folder_url || '');
+            setShowDriveModal(true);
+          }}
+        >
+          📁 {userProfile?.drive_folder_url ? 'Update My Drive Folder' : 'Link Google Drive Folder'}
+        </button>
       </div>
+
+      {/* Modal for setting Drive Link */}
+      {showDriveModal && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 1000,
+          display: 'flex', justifyContent: 'center', alignItems: 'center'
+        }}>
+          <div style={{ background: '#1e1e1e', padding: '24px', borderRadius: '8px', maxWidth: '480px', width: '100%' }}>
+            <h3>Set Personal Google Drive Folder</h3>
+            <p style={{ fontSize: '0.85rem', color: '#ccc', margin: '8px 0 16px 0' }}>
+              Paste the shareable Google Drive link to your assigned personal folder.
+            </p>
+            <input 
+              type="text" 
+              placeholder="https://drive.google.com/drive/folders/..." 
+              value={driveUrlInput}
+              onChange={(e) => setDriveUrlInput(e.target.value)}
+              style={{ width: '100%', padding: '10px', borderRadius: '4px', border: '1px solid #444', background: '#111', color: '#fff' }}
+            />
+            <div style={{ marginTop: '16px', display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+              <button onClick={() => setShowDriveModal(false)} style={{ padding: '6px 12px', background: 'transparent', border: 'none', color: '#ccc' }}>Cancel</button>
+              <button onClick={handleSaveDriveUrl} disabled={savingDrive} style={{ padding: '6px 16px', background: '#2563eb', border: 'none', borderRadius: '4px', color: '#fff' }}>
+                {savingDrive ? 'Saving...' : 'Save Link'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal for Viewing Full AI Report */}
+      {selectedReport && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', zIndex: 1100,
+          display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '20px'
+        }}>
+          <div style={{ background: '#18181b', border: '1px solid #333', padding: '24px', borderRadius: '12px', maxWidth: '720px', width: '100%', maxHeight: '80vh', overflowY: 'auto' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <h3>✨ Performance Report ({selectedReport.period_type})</h3>
+              <button onClick={() => setSelectedReport(null)} style={{ background: 'transparent', border: 'none', color: '#aaa', fontSize: '1.2rem', cursor: 'pointer' }}>✕</button>
+            </div>
+            <div style={{ fontSize: '0.85rem', color: '#888', marginBottom: '16px' }}>
+              Created: {formatTimeShort(selectedReport.created_at)} | Author: {getProfileDisplayName(selectedReport.profile)}
+            </div>
+            <div style={{ whiteSpace: 'pre-wrap', lineHeight: '1.6', background: '#09090b', padding: '16px', borderRadius: '8px', fontSize: '0.9rem', color: '#e4e4e7', border: '1px solid #27272a' }}>
+              {selectedReport.summary_markdown}
+            </div>
+            <div style={{ marginTop: '20px', display: 'flex', justifyContent: 'flex-end' }}>
+              <button 
+                onClick={() => {
+                  const blob = new Blob([selectedReport.summary_markdown], { type: 'text/markdown' });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = `Report_${selectedReport.period_type}_${selectedReport.created_at.split('T')[0]}.md`;
+                  a.click();
+                }}
+                style={{ padding: '8px 16px', background: '#2563eb', border: 'none', borderRadius: '6px', color: '#fff', cursor: 'pointer' }}
+              >
+                Download (.md)
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── AI Generated Performance Reports Section ── */}
+      {userReports.length > 0 && (
+        <div style={{ marginBottom: '28px' }}>
+          <h3 style={{ fontSize: '1rem', fontWeight: 600, color: '#e4e4e7', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span>✨</span> AI Generated Reports ({userReports.length})
+          </h3>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '12px' }}>
+            {userReports.map((report) => (
+              <div 
+                key={report.id} 
+                onClick={() => setSelectedReport(report)}
+                style={{
+                  background: 'var(--bg-input, #1e1e24)',
+                  border: '1px solid var(--border-color, #2d2d3a)',
+                  borderRadius: '8px',
+                  padding: '14px',
+                  cursor: 'pointer',
+                  transition: 'transform 0.15s ease',
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                  <span style={{ fontSize: '0.75rem', fontWeight: 600, background: '#2563eb22', color: '#60a5fa', padding: '2px 8px', borderRadius: '4px' }}>
+                    {report.period_type}
+                  </span>
+                  <span style={{ fontSize: '0.75rem', color: '#888' }}>
+                    {formatTimeShort(report.created_at)}
+                  </span>
+                </div>
+                <div style={{ fontSize: '0.85rem', fontWeight: 500, color: '#fff', marginBottom: '4px' }}>
+                  Performance Report
+                </div>
+                <div style={{ fontSize: '0.75rem', color: '#aaa' }}>
+                  By: {getProfileDisplayName(report.profile)}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* ── Search Bar & Filter Tabs ── */}
       <div className="docs-toolbar" style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginBottom: '20px' }}>
@@ -415,7 +582,7 @@ function DocumentsContent() {
       ) : (
         <div className="docs-list">
           {visible.map((r) => {
-            const creatorDisplayName = getDisplayName(r.creator);
+            const creatorDisplayName = getProfileDisplayName(r.creator);
             const myRec = r.file_route_recipients?.find((rc) => rc.profile_id === userId);
             const needsAction = myRec && (myRec.status === 'PENDING' || myRec.status === 'OPENED');
             const isExpanded = expanded === r.id;
@@ -423,12 +590,9 @@ function DocumentsContent() {
             const events = [...(r.file_route_events || [])].sort(
               (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
             );
-            const openedCount = recipients.filter((rc) => rc.opened_at).length;
-            const doneCount = recipients.filter((rc) => rc.status === 'DONE').length;
 
             return (
               <div key={r.id} className={`docs-card ${needsAction ? 'needs-action' : ''} ${r.status === 'COMPLETED' ? 'completed' : ''}`}>
-                {/* Card header */}
                 <div className="docs-card-header" onClick={() => setExpanded(isExpanded ? null : r.id)}>
                   <div className="docs-card-header-left">
                     <div className={`docs-file-type-icon ${r.status === 'COMPLETED' ? 'done' : needsAction ? 'urgent' : ''}`}>
@@ -454,87 +618,21 @@ function DocumentsContent() {
                   </div>
                 </div>
 
-                {/* Visual chain */}
-                <div className="docs-chain-preview">
-                  <div className="docs-chain-inner">
-                    {/* Originator */}
-                    <div className="docs-node originator">
-                      <Avatar name={creatorDisplayName} avatarUrl={r.creator?.avatar_url} size="sm" />
-                      <div className="docs-node-label">{creatorDisplayName.split(' ')[0]}</div>
-                      <div className="docs-node-sublabel">Originator</div>
-                    </div>
-
-                    {/* Fan-out connector */}
-                    {recipients.length > 0 && (
-                      <div className="docs-fanout">
-                        <div className="docs-fanout-spine" />
-                        <div className="docs-fanout-recipients">
-                          {recipients.map((rc) => {
-                            const recipientDisplayName = getDisplayName(rc.profile);
-                            const isMe = rc.profile_id === userId;
-                            const nodeClass = rc.status === 'DONE' ? 'done' : rc.opened_at ? 'opened' : 'pending';
-                            const avatarClass = rc.status === 'DONE' ? 'green' : rc.opened_at ? 'teal' : 'grey';
-
-                            return (
-                              <div key={rc.id} className="docs-fanout-row">
-                                <div className={`docs-fanout-line ${rc.opened_at ? 'active' : ''}`} />
-                                <div className={`docs-fanout-arrow ${rc.opened_at ? 'active' : ''}`}>▶</div>
-                                <div className={`docs-node ${nodeClass} ${isMe ? 'is-me' : ''}`}>
-                                  <div className={`docs-node-avatar ${avatarClass}`}>
-                                    {initials(recipientDisplayName)}
-                                  </div>
-                                  <div className="docs-node-label">
-                                    {recipientDisplayName.split(' ')[0]}
-                                    {isMe && <span className="docs-node-me-tag">you</span>}
-                                  </div>
-                                  <div className="docs-node-sublabel">
-                                    {rc.status === 'DONE'
-                                      ? '✓ Done'
-                                      : rc.opened_at
-                                      ? '👁 Opened'
-                                      : '⏳ Pending'}
-                                  </div>
-                                  {rc.opened_at && (
-                                    <div className="docs-node-time">{formatTimeShort(rc.opened_at)}</div>
-                                  )}
-                                  {rc.completed_at && (
-                                    <div className="docs-node-time done">{formatTimeShort(rc.completed_at)}</div>
-                                  )}
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Stats */}
-                  <div className="docs-chain-summary">
-                    <span className={openedCount === recipients.length && recipients.length > 0 ? 'all-opened' : ''}>
-                      {openedCount}/{recipients.length} opened
-                    </span>
-                    <span className={doneCount === recipients.length && recipients.length > 0 ? 'all-done' : ''}>
-                      {doneCount}/{recipients.length} done
-                    </span>
-                  </div>
-                </div>
-
-                {/* Expanded Section */}
                 {isExpanded && (
                   <div className="docs-expanded">
-                    {/* Open file button */}
-                    <a
-                      href={r.file_url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="docs-open-file-btn"
-                      onClick={() => markOpened(r.id)}
-                    >
-                      🔗 Open File in Drive
-                    </a>
+                    <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginBottom: '16px' }}>
+                      {/* Direct Google Drive Link if provided, otherwise fallback to base file_url */}
+                      <a
+                        href={r.drive_url || r.file_url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="docs-open-file-btn"
+                        onClick={() => markOpened(r.id)}
+                      >
+                        {r.drive_url ? '📂 Open Document (Drive)' : '🔗 Open Document File'}
+                      </a>
+                    </div>
 
-                    {/* Action buttons for recipient */}
                     {myRec && myRec.status !== 'DONE' && r.status !== 'COMPLETED' && (
                       <div className="docs-my-actions">
                         <div className="docs-my-actions-label">Your actions</div>
@@ -549,13 +647,12 @@ function DocumentsContent() {
                       </div>
                     )}
 
-                    {/* Timeline */}
                     <div className="docs-timeline-label">Activity Timeline</div>
                     <div className="docs-timeline">
                       {events.length === 0 && <div className="docs-timeline-empty">No activity yet.</div>}
                       {events.map((ev, i) => {
-                        const actorDisplayName = getDisplayName(ev.actor);
-                        const forwardTargetDisplayName = getDisplayName(ev.forwarded_to_profile);
+                        const actorDisplayName = getProfileDisplayName(ev.actor);
+                        const forwardTargetDisplayName = getProfileDisplayName(ev.forwarded_to_profile);
                         const isLast = i === events.length - 1;
                         const actionMeta: Record<string, { icon: string; color: string; label: string }> = {
                           CREATED: { icon: '✦', color: 'var(--gold)', label: 'Created & routed' },
@@ -594,30 +691,34 @@ function DocumentsContent() {
                       })}
                     </div>
 
-                    {/* Recipients detail */}
                     <div className="docs-timeline-label" style={{ marginTop: 20 }}>
                       All Recipients
                     </div>
                     <div className="docs-recipients-table">
                       {recipients.map((rc) => {
-                        const recipientDisplayName = getDisplayName(rc.profile);
+                        const recipientDisplayName = getProfileDisplayName(rc.profile);
                         return (
-                          <div key={rc.id} className="docs-recipient-row">
-                            <div className="docs-tl-avatar">{initials(recipientDisplayName)}</div>
-                            <div className="docs-recipient-info">
-                              <div className="docs-recipient-name">{recipientDisplayName}</div>
-                              <div className="docs-recipient-desig">{rc.profile?.designation}</div>
+                          <div key={rc.id} className="docs-recipient-row" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <div className="docs-tl-avatar">{initials(recipientDisplayName)}</div>
+                              <div className="docs-recipient-info">
+                                <div className="docs-recipient-name">{recipientDisplayName}</div>
+                                <div className="docs-recipient-desig">{rc.profile?.designation}</div>
+                              </div>
                             </div>
-                            <div className="docs-recipient-timestamps">
-                              {rc.opened_at ? (
-                                <div className="docs-ts opened">👁 Opened {formatTimeShort(rc.opened_at)}</div>
-                              ) : (
-                                <div className="docs-ts pending">⏳ Not yet opened</div>
-                              )}
-                              {rc.completed_at && (
-                                <div className="docs-ts done">✓ Done {formatTimeShort(rc.completed_at)}</div>
-                              )}
-                            </div>
+                            
+                            {/* Link to recipient's personal Google Drive folder if available */}
+                            {rc.profile?.drive_folder_url && (
+                              <a 
+                                href={rc.profile.drive_folder_url} 
+                                target="_blank" 
+                                rel="noreferrer"
+                                style={{ fontSize: '0.8rem', color: '#60a5fa', textDecoration: 'underline' }}
+                              >
+                                View Folder 📁
+                              </a>
+                            )}
+
                             <div className={`docs-recip-status ${rc.status.toLowerCase()}`}>
                               {rc.status}
                             </div>

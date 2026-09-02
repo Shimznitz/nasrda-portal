@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.11.2",
+    "@google/genai": "^2.20.0",
     "@supabase/ssr": "^0.10.2",
     "@supabase/supabase-js": "^2.103.3",
     "bcryptjs": "^2.4.3",
