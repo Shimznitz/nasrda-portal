@@ -253,13 +253,16 @@ export default function MessagesPage() {
           </div>
         ) : (
           <>
-            <div className="msg-chat-header">
-              <Avatar name={displayName(activeConv)} avatarUrl={activeConv.avatar_url} size="md" />
-              <div className="msg-chat-header-info">
-                <div className="msg-chat-name">{displayName(activeConv)}</div>
-                <div className="msg-chat-role">{getRole(activeConv)}</div>
-              </div>
+          <div className="msg-chat-header">
+            <button className="msg-back-btn" onClick={() => setActiveConv(null)}>
+              ←
+            </button>
+            <Avatar name={displayName(activeConv)} avatarUrl={activeConv.avatar_url} size="md" />
+            <div className="msg-chat-header-info">
+              <div className="msg-chat-name">{displayName(activeConv)}</div>
+              <div className="msg-chat-role">{getRole(activeConv)}</div>
             </div>
+          </div>
 
             <div className="msg-chat-body">
               {messages.length === 0 ? (
