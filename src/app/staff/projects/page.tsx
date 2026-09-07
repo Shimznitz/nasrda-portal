@@ -36,11 +36,14 @@ export default function StaffProjectsDashboard() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      const { data: prof } = await supabase
+      const { data: prof, error } = await supabase
         .from('profiles')
-        .select('id, role, centre_id, division_id, department_id, unit_id, title, display_name, full_name, name')
+        .select('id, role, centre_id, division_id, department_id, unit_id, title, name')
         .eq('id', user.id)
         .single();
+
+      console.log("QUERY ERROR (if any):", error);
+      console.log("MY ACTUAL DATABASE ROLE IS:", prof?.role);
 
       if (!prof) return;
       setProfile(prof);
