@@ -6,16 +6,13 @@ import { supabase } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
 import "./projects.css";
 
-// Helper function to resolve dynamic display names across all profile objects
 const getDisplayName = (person: any) => {
   if (!person) return 'Unknown';
-  
-  const rawName = person.display_name || person.full_name || person.name;
+  const rawName = person.name;
   if (rawName && rawName.trim() !== '') {
     const honorific = person.title ? `${person.title.trim()} ` : '';
     return `${honorific}${rawName.trim()}`;
   }
-  
   return 'Unknown';
 };
 
@@ -36,14 +33,11 @@ export default function StaffProjectsDashboard() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      const { data: prof, error } = await supabase
+      const { data: prof } = await supabase
         .from('profiles')
-        .select('id, role, centre_id, division_id, department_id, unit_id, title, name')
+        .select('*')
         .eq('id', user.id)
         .single();
-
-      console.log("QUERY ERROR (if any):", error);
-      console.log("MY ACTUAL DATABASE ROLE IS:", prof?.role);
 
       if (!prof) return;
       setProfile(prof);
@@ -57,16 +51,12 @@ export default function StaffProjectsDashboard() {
 
       let query = supabase
         .from('projects')
-        .select('*, creator:profiles!created_by(id, title, display_name, full_name, name)')
+        .select('*, creator:profiles!created_by(id, title, name)')
         .order('created_at', { ascending: false });
 
       if (isPrivileged) {
-        const conditions: string[] = [`created_by.eq.${prof.id}`];
-        if (prof.centre_id)     conditions.push(`centre_id.eq.${prof.centre_id}`);
-        if (prof.division_id)   conditions.push(`div_scope_id.eq.${prof.division_id}`, `division_id.eq.${prof.division_id}`);
-        if (prof.department_id) conditions.push(`dept_scope_id.eq.${prof.department_id}`);
-        if (prof.unit_id)       conditions.push(`unit_scope_id.eq.${prof.unit_id}`);
-        query = query.or(conditions.join(','));
+        // Scope privileged users to projects they created or lead
+        query = query.or(`created_by.eq.${prof.id},lead_id.eq.${prof.id}`);
       } else {
         const { data: memberships } = await supabase
           .from('project_members')
@@ -81,7 +71,8 @@ export default function StaffProjectsDashboard() {
         query = query.in('id', projectIds);
       }
 
-      const { data } = await query;
+      const { data, error: queryErr } = await query;
+      if (queryErr) console.error("Projects fetch error:", queryErr);
       setProjects(data || []);
     } finally {
       setLoading(false);
@@ -218,19 +209,14 @@ function CreateProjectModal({ onClose, onSuccess, profile }: any) {
     const timeout = setTimeout(async () => {
       try {
         const term = `%${memberSearch}%`;
-        let query = supabase
+        const { data, error: searchErr } = await supabase
           .from('profiles')
-          .select('id, title, display_name, full_name, name, designation')
-          .or(`display_name.ilike.${term},full_name.ilike.${term},name.ilike.${term}`)
+          .select('id, title, name')
+          .ilike('name', term)
           .neq('id', profile.id)
           .limit(10);
 
-        if (profile.centre_id)         query = query.eq('centre_id', profile.centre_id);
-        else if (profile.division_id)   query = query.eq('division_id', profile.division_id);
-        else if (profile.department_id) query = query.eq('department_id', profile.department_id);
-        else if (profile.unit_id)       query = query.eq('unit_id', profile.unit_id);
-
-        const { data } = await query;
+        if (searchErr) console.error("Profile search error:", searchErr);
         setSearchResults(data || []);
       } finally {
         setSearching(false);
@@ -254,8 +240,7 @@ function CreateProjectModal({ onClose, onSuccess, profile }: any) {
   };
 
   const getInitials = (person: any) => {
-    const name = person.display_name || person.full_name || person.name || 'Unknown';
-    
+    const name = person.name || 'Unknown';
     return name
       .split(' ')
       .filter(Boolean)
@@ -278,11 +263,6 @@ function CreateProjectModal({ onClose, onSuccess, profile }: any) {
         due_date: form.due_date || null,
         created_by: profile.id,
         lead_id: leadId || profile.id,
-        centre_id: profile.centre_id || null,
-        division_id: profile.division_id || null,
-        dept_scope_id: profile.department_id || null,
-        div_scope_id: profile.division_id || null,
-        unit_scope_id: profile.unit_id || null,
         parent_project_id: parentProjectId || null,
         progress: 0,
         status: 'ACTIVE',
@@ -297,7 +277,6 @@ function CreateProjectModal({ onClose, onSuccess, profile }: any) {
       return;
     }
 
-    // Deduplicate member IDs to protect unique primary keys
     const rawMembers = [
       { profile_id: profile.id, is_lead: !leadId || leadId === profile.id },
       ...teamMembers.map((m) => ({
@@ -317,7 +296,14 @@ function CreateProjectModal({ onClose, onSuccess, profile }: any) {
 
     const memberRows = Array.from(uniqueMemberMap.values());
 
-    await supabase.from('project_members').insert(memberRows);
+    const { error: memberError } = await supabase.from('project_members').insert(memberRows);
+    if (memberError) {
+      console.error("Member insert error:", memberError);
+      setError("Project created, but failed to add team members: " + memberError.message);
+      setSaving(false);
+      return;
+    }
+
     onSuccess();
   };
 
@@ -385,7 +371,6 @@ function CreateProjectModal({ onClose, onSuccess, profile }: any) {
                   </div>
                   <div className="search-item-info">
                     <div className="search-name">{getDisplayName(staff)}</div>
-                    <div className="search-designation">{staff.designation}</div>
                   </div>
                   <span className="add-label">+ Add</span>
                 </div>
@@ -405,7 +390,6 @@ function CreateProjectModal({ onClose, onSuccess, profile }: any) {
                   </div>
                   <div className="member-info">
                     <div className="search-name">{getDisplayName(m)}</div>
-                    <div className="search-designation">{m.designation}</div>
                   </div>
                   <button
                     type="button"
@@ -440,7 +424,7 @@ function CreateProjectModal({ onClose, onSuccess, profile }: any) {
         )}
 
         <div className="modal-actions">
-          <button onClick={onClose}>Cancel</button>
+          <button onClick={onClose}>Cancel / Close</button>
           <button className="btn" onClick={createProject} disabled={saving || !form.title.trim()}>
             {saving ? 'Creating…' : 'Create Project'}
           </button>

@@ -111,16 +111,21 @@ Deno.serve(async (req: Request) => {
       dispatchResults.email = 'skipped (no API key or email)';
     }
 
-    // ── CHANNEL 2: SMS via Twilio ─────────────────────────────
-    if (TWILIO_ACCOUNT_SID && TWILIO_AUTH_TOKEN && TWILIO_PHONE_NUM && profile?.whatsapp) {
+    // ── CHANNEL 2: SMS via Twilio (using whatsapp column) ─────
+    const targetPhone = profile?.whatsapp;
+    if (TWILIO_ACCOUNT_SID && TWILIO_AUTH_TOKEN && TWILIO_PHONE_NUM && targetPhone) {
       try {
-        let phone = profile.whatsapp.replace(/[\s\-\(\)\.]/g, '');
-        if (phone.startsWith('0')) {
-          phone = '+234' + phone.slice(1);
+        let phone = targetPhone.replace(/[\s\-\(\)\.]/g, '');
+        
+        // Handle all common Nigerian number formats
+        if (phone.startsWith('+234')) {
+          // Already correct
         } else if (phone.startsWith('234')) {
           phone = '+' + phone;
+        } else if (phone.startsWith('0')) {
+          phone = '+234' + phone.slice(1);
         } else if (!phone.startsWith('+')) {
-          phone = '+' + phone;
+          phone = '+234' + phone;
         }
 
         if (!/^\+\d{10,15}$/.test(phone)) {
@@ -137,21 +142,21 @@ Deno.serve(async (req: Request) => {
               },
               body: new URLSearchParams({
                 To:   phone,
-                From: TWILIO_PHONE_NUM,
-                Body: `[NASRDA Portal] ${notifTitle}: ${notifBody}`,
+                From: TWILIO_PHONE_NUM.trim(),
+                Body: `[NASRDA Portal] ${notifTitle}: ${notifBody}. View: ${siteUrl}/staff/notifications`,
               }),
             }
           );
 
           const smsJson = await resSMS.json();
-          console.log("Twilio API Response:", JSON.stringify(smsJson));
+          console.log("Twilio SMS Response:", JSON.stringify(smsJson));
           dispatchResults.sms = resSMS.ok ? 'sent' : `failed: ${JSON.stringify(smsJson)}`;
         }
       } catch (e: any) {
         dispatchResults.sms = `error: ${e.message}`;
       }
     } else {
-      dispatchResults.sms = 'skipped (missing credentials or phone number)';
+      dispatchResults.sms = 'skipped (missing credentials or whatsapp number)';
     }
 
     return new Response(

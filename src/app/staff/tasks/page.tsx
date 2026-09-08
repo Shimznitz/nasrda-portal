@@ -212,15 +212,34 @@ export default function TasksPage() {
   };
 
   const softDeleteTask = async (task: any) => {
-    if (!confirm(`Delete task "${task.title}"? The activity log will be preserved.`)) return;
-    await supabase.from('tasks').update({ deleted_at: new Date().toISOString() }).eq('id', task.id);
-    await supabase.from('activity_logs').insert({
-      actor_id: currentUser.id, entity_type: 'TASK',
-      entity_id: task.id, action: 'DELETED',
-      note: `Task "${task.title}" deleted by ${profile?.name}`,
-    });
-    await loadTasks(currentUser.id, profile);
-  };
+  if (!confirm(`Delete task "${task.title}"? The activity log will be preserved.`)) return;
+  
+  // Capture the error object from the update
+  const { error: updateError } = await supabase
+    .from('tasks')
+    .update({ deleted_at: new Date().toISOString() })
+    .eq('id', task.id);
+
+  if (updateError) {
+    console.error('Failed to soft-delete task:', updateError.message);
+    alert(`Error deleting task: ${updateError.message}`);
+    return;
+  }
+
+  const { error: logError } = await supabase.from('activity_logs').insert({
+    actor_id: currentUser.id, 
+    entity_type: 'TASK',
+    entity_id: task.id, 
+    action: 'DELETED',
+    note: `Task "${task.title}" deleted by ${profile?.name}`,
+  });
+
+  if (logError) console.error('Failed to save activity log:', logError.message);
+
+  // Instantly remove from UI and reload
+  setTasks(prev => prev.filter(t => t.id !== task.id));
+  await loadTasks(currentUser.id, profile);
+};
 
   const filtered = tasks.filter(t => {
     const matchSearch = !search ||
