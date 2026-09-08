@@ -3,6 +3,7 @@
 
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
+import ReactMarkdown from "react-markdown";
 import { initials, getFirstName, displayName, formatRole } from '@/lib/utils';
 
 import Link from "next/link";
@@ -129,27 +130,55 @@ export default function Topbar() {
   };
 
   const handleSendAiMessage = async () => {
-    if (!aiMessage.trim() || aiLoading) return;
+  if (!aiMessage.trim() || aiLoading) return;
 
-    const userText = aiMessage;
-    setAiMessage('');
-    setChatHistory(prev => [...prev, { sender: 'user', text: userText }]);
-    setAiLoading(true);
+  const userText = aiMessage;
+  setAiMessage('');
+  setChatHistory(prev => [...prev, { sender: 'user', text: userText }]);
+  setAiLoading(true);
 
-    try {
-      const res = await fetch('/api/ai/assistant', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'chat', message: userText }),
-      });
-      const data = await res.json();
-      setChatHistory(prev => [...prev, { sender: 'ai', text: data.text || 'No response.' }]);
-    } catch (err) {
-      setChatHistory(prev => [...prev, { sender: 'ai', text: 'An error occurred while contacting the assistant.' }]);
-    } finally {
-      setAiLoading(false);
+  try {
+    const res = await fetch('/api/ai/assistant', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'chat',
+        message: userText
+      }),
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      throw new Error(
+        data.error ||
+        data.message ||
+        `Assistant request failed (${res.status})`
+      );
     }
-  };
+
+    setChatHistory(prev => [
+      ...prev,
+      {
+        sender: 'ai',
+        text: data.text || 'The assistant returned an empty response.'
+      }
+    ]);
+
+  } catch (err: any) {
+    console.error('AI Assistant request error:', err);
+
+    setChatHistory(prev => [
+      ...prev,
+      {
+        sender: 'ai',
+        text: `Sorry, I couldn't process that request.\n\nError: ${err?.message || 'Unknown error'}`
+      }
+    ]);
+  } finally {
+    setAiLoading(false);
+  }
+};
 
   const handleGenerateReport = async () => {
     setAiLoading(true);
@@ -300,8 +329,12 @@ export default function Topbar() {
                   )}
                   {chatHistory.map((item, idx) => (
                     <div key={idx} className={`ai-chat-bubble ${item.sender}`}>
-                      {item.text}
-                    </div>
+                      {item.sender === 'ai' ? (
+                        <ReactMarkdown>{item.text}</ReactMarkdown>
+                    ) : (
+                      item.text
+                        )}
+                      </div>
                   ))}
                   {aiLoading && (
                     <div className="ai-chat-loading">
@@ -394,7 +427,7 @@ export default function Topbar() {
                 {generatedReport && (
                   <div className="ai-report-output-container">
                     <div className="ai-report-output">
-                      {generatedReport}
+                       <ReactMarkdown>{generatedReport}</ReactMarkdown>
                     </div>
 
                     <div className="ai-dispatch-card">
