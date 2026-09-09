@@ -184,15 +184,18 @@ export async function POST(req: Request) {
     // ============================================================
 
     const {
-      data: profileData,
-      error: profileError,
-    } = await supabase
-      .from('profiles')
-      .select(
-        'id, name, designation, title, role, department_id, division_id, unit_id'
-      )
-      .eq('id', user.id)
-      .single();
+  data: profileData,
+  error: profileError,
+} = await supabase
+  .from('profiles')
+  .select(`
+    id, name, designation, title, role, department_id, division_id, unit_id,
+    departments:department_id (name),
+    divisions:division_id (name),
+    units:unit_id (name)
+  `)
+  .eq('id', user.id)
+  .single();
 
     if (profileError) {
       console.error(
@@ -276,156 +279,104 @@ export async function POST(req: Request) {
 
       let staffQuery = supabaseAdmin
         .from('profiles')
-        .select(
-          'id, name, designation, title, role, skills, qualification, department_id, division_id, unit_id'
-        );
+        .select(`
+          id, name, designation, title, role, skills, qualification, department_id, division_id, unit_id,
+          departments:department_id (name),
+          divisions:division_id (name),
+          unitss:unit_id (name)
+        `);
+
+      let projectsQuery = supabase
+        .from('projects')
+        .select(`
+          id, title, description, objectives, budget, status, progress, due_date, 
+          created_by, lead_id, division_id, centre_id, dept_scope_id, div_scope_id, unit_scope_id, centre_lab_scope_id, created_at, parent_project_id,
+          divisions:division_id (name),
+          dept_scopes:dept_scope_id (name),
+          div_scopes:div_scope_id (name),
+          unit_scopes:unit_scope_id (name),
+          creator:created_by (name),
+          lead:lead_id (name)
+        `)
+        .is('deleted_at', null);  
 
       // ==========================================================
-      // ROLE-BASED ACCESS SCOPE
-      // ==========================================================
+// ROLE-BASED ACCESS SCOPE
+// ==========================================================
 
-      switch (profile.role) {
-        // --------------------------------------------------------
-        // SUPER ADMIN / DG
-        //
-        // Full agency-wide staff visibility.
-        // --------------------------------------------------------
+switch (profile.role) {
+  // --------------------------------------------------------
+  // SUPER ADMIN / DG
+  // Full agency-wide visibility.
+  // --------------------------------------------------------
+  case 'SUPER_ADMIN':
+  case 'DG':
+    break;
 
-        case 'SUPER_ADMIN':
-        case 'DG':
-          break;
+  // --------------------------------------------------------
+  // DEPARTMENT ADMIN
+  // --------------------------------------------------------
+  case 'DEPT_ADMIN':
+    if (profile.department_id) {
+      staffQuery = staffQuery.eq('department_id', profile.department_id);
+      projectsQuery = projectsQuery.eq('dept_scope_id', profile.department_id);
+    } else {
+      staffQuery = staffQuery.eq('id', '__NO_MATCHING_PROFILE__');
+      projectsQuery = projectsQuery.eq('id', '__NO_MATCHING_PROFILE__');
+    }
+    break;
 
-        // --------------------------------------------------------
-        // DEPARTMENT ADMIN
-        // --------------------------------------------------------
+  // --------------------------------------------------------
+  // DIVISION HEAD
+  // --------------------------------------------------------
+  case 'DIVISION_HEAD':
+    if (profile.division_id) {
+      tasksQuery = tasksQuery.eq('division_id', profile.division_id);
+      projectsQuery = projectsQuery.or(`division_id.eq.${profile.division_id},div_scope_id.eq.${profile.division_id}`);
+      routesQuery = routesQuery.eq('division_id', profile.division_id);
+      staffQuery = staffQuery.eq('division_id', profile.division_id);
+    } else if (profile.department_id) {
+      staffQuery = staffQuery.eq('department_id', profile.department_id);
+      projectsQuery = projectsQuery.eq('dept_scope_id', profile.department_id);
+    } else {
+      staffQuery = staffQuery.eq('id', '__NO_MATCHING_PROFILE__');
+      projectsQuery = projectsQuery.eq('id', '__NO_MATCHING_PROFILE__');
+    }
+    break;
 
-        case 'DEPT_ADMIN':
-          if (profile.department_id) {
-            tasksQuery =
-              tasksQuery.eq(
-                'department_id',
-                profile.department_id
-              );
+  // --------------------------------------------------------
+  // UNIT HEAD
+  // --------------------------------------------------------
+  case 'UNIT_HEAD':
+    if (profile.unit_id) {
+      tasksQuery = tasksQuery.eq('unit_id', profile.unit_id);
+      projectsQuery = projectsQuery.eq('unit_scope_id', profile.unit_id);
+      routesQuery = routesQuery.eq('unit_id', profile.unit_id);
+      staffQuery = staffQuery.eq('unit_id', profile.unit_id);
+    } else {
+      staffQuery = staffQuery.eq('id', '__NO_MATCHING_PROFILE__');
+      projectsQuery = projectsQuery.eq('id', '__NO_MATCHING_PROFILE__');
+    }
+    break;
 
-            routesQuery =
-              routesQuery.eq(
-                'department_id',
-                profile.department_id
-              );
-
-            staffQuery =
-              staffQuery.eq(
-                'department_id',
-                profile.department_id
-              );
-          } else {
-            /*
-             * If the user has no department assigned,
-             * do not expose other personnel.
-             */
-            staffQuery =
-              staffQuery.eq(
-                'id',
-                '__NO_MATCHING_PROFILE__'
-              );
-          }
-
-          break;
-
-        // --------------------------------------------------------
-        // DIVISION HEAD
-        // --------------------------------------------------------
-
-        case 'DIVISION_HEAD':
-          if (profile.division_id) {
-            tasksQuery =
-              tasksQuery.eq(
-                'division_id',
-                profile.division_id
-              );
-
-            routesQuery =
-              routesQuery.eq(
-                'division_id',
-                profile.division_id
-              );
-
-            staffQuery =
-              staffQuery.eq(
-                'division_id',
-                profile.division_id
-              );
-          } else {
-            staffQuery =
-              staffQuery.eq(
-                'id',
-                '__NO_MATCHING_PROFILE__'
-              );
-          }
-
-          break;
-
-        // --------------------------------------------------------
-        // UNIT HEAD
-        // --------------------------------------------------------
-
-        case 'UNIT_HEAD':
-          if (profile.unit_id) {
-            tasksQuery =
-              tasksQuery.eq(
-                'unit_id',
-                profile.unit_id
-              );
-
-            routesQuery =
-              routesQuery.eq(
-                'unit_id',
-                profile.unit_id
-              );
-
-            staffQuery =
-              staffQuery.eq(
-                'unit_id',
-                profile.unit_id
-              );
-          } else {
-            staffQuery =
-              staffQuery.eq(
-                'id',
-                '__NO_MATCHING_PROFILE__'
-              );
-          }
-
-          break;
-
-        // --------------------------------------------------------
-        // STAFF
-        //
-        // Staff users can only see their own personnel record.
-        // --------------------------------------------------------
-
-        case 'STAFF':
-        default:
-          tasksQuery =
-            tasksQuery.eq(
-              'assigned_to',
-              user.id
-            );
-
-          routesQuery =
-            routesQuery.eq(
-              'created_by',
-              user.id
-            );
-
-          staffQuery =
-            staffQuery.eq(
-              'id',
-              user.id
-            );
-
-          break;
-      }
+  // --------------------------------------------------------
+  // STAFF
+  // --------------------------------------------------------
+  case 'STAFF':
+  default:
+    if (profile.department_id) {
+      staffQuery = staffQuery.eq('department_id', profile.department_id);
+      tasksQuery = tasksQuery.eq('assigned_to', user.id); // Fixed: tasks has no department_id
+      routesQuery = routesQuery.or(`created_by.eq.${user.id}`); // Fixed: update or remove department_id reference
+      projectsQuery = projectsQuery.or(`created_by.eq.${user.id},lead_id.eq.${user.id},dept_scope_id.eq.${profile.department_id}`);
+    } else {
+      tasksQuery = tasksQuery.eq('assigned_to', user.id);
+      projectsQuery = projectsQuery.or(`created_by.eq.${user.id},lead_id.eq.${user.id}`);
+      routesQuery = routesQuery.eq('created_by', user.id);
+      staffQuery = staffQuery.eq('id', user.id);
+    }
+    break;
+}
 
       // ==========================================================
       // 7. FETCH DATA
@@ -732,7 +683,7 @@ IMPORTANT SECURITY AND DATA RULES:
 
 16. When asked for personnel distribution by unit, use staffStatistics.byUnit.
 
-17. Department, division, and unit values may currently be UUIDs because the current database context contains IDs. NEVER invent human-readable organizational names for UUIDs.
+17. Department, division, and unit names are provided via the joined relations (departments.name, divisions.name, dept_scopes.name, div_scopes.name, unit_scopes.name). Use those human-readable text names instead of raw UUIDs when responding to the user.
 
 18. If the user asks for an individual staff member's details, use subordinateStaff.
 
@@ -1080,25 +1031,26 @@ Structure the Markdown report strictly into these sections:
     // INVALID ACTION
     // ============================================================
 
-    return NextResponse.json(
-      {
-        error: 'Invalid action',
-      },
-      { status: 400 }
-    );
-  } catch (err: any) {
+    } catch (err: any) {
     console.error(
       'AI Assistant Error:',
       err
     );
 
+    const errorMessage = err?.message || '';
+    const isRateLimit = 
+      err?.status === 429 || 
+      err?.code === 429 || 
+      errorMessage.includes('RESOURCE_EXHAUSTED') ||
+      errorMessage.includes('quota');
+
     return NextResponse.json(
       {
-        error:
-          err?.message ||
-          'Internal error',
+        error: isRateLimit
+          ? 'The AI assistant is currently experiencing high demand. Please try again in a moment.'
+          : (errorMessage || 'Internal error'),
       },
-      { status: 500 }
+      { status: isRateLimit ? 429 : 500 }
     );
   }
 }

@@ -18,7 +18,7 @@ export type UserRole =
   | 'UNIT_HEAD'
   | 'STAFF';
 
-export type ReportPeriod = 'WEEK' | 'MONTH' | 'YEAR' | 'CUSTOM';
+export type ReportPeriod = 'WEEKS' | 'MONTHS' | 'YEARS' | 'CUSTOM';
 
 export const getRoleTitle = (role?: UserRole | string): string => {
   if (!role) return formatRole(role);
@@ -49,7 +49,7 @@ export default function Topbar() {
   const [aiLoading, setAiLoading] = useState(false);
 
   // Report Period State
-  const [period, setPeriod] = useState<ReportPeriod>('MONTH');
+  const [period, setPeriod] = useState<ReportPeriod>('MONTHS');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [generatedReport, setGeneratedReport] = useState<string | null>(null);
@@ -189,13 +189,13 @@ export default function Topbar() {
     let end = endDate;
 
     const now = new Date();
-    if (period === 'WEEK') {
+    if (period === 'WEEKS') {
       start = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
       end = now.toISOString();
-    } else if (period === 'MONTH') {
+    } else if (period === 'MONTHS') {
       start = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString();
       end = now.toISOString();
-    } else if (period === 'YEAR') {
+    } else if (period === 'YEARS') {
       start = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000).toISOString();
       end = now.toISOString();
     }
@@ -367,20 +367,20 @@ export default function Topbar() {
                   <span className="ai-label">Select Report Range:</span>
                   <div className="ai-date-pills">
                     <button 
-                      className={`ai-pill-btn ${period === 'WEEK' ? 'active' : ''}`}
-                      onClick={() => setPeriod('WEEK')}
+                      className={`ai-pill-btn ${period === 'WEEKS' ? 'active' : ''}`}
+                      onClick={() => setPeriod('WEEKS')}
                     >
                       Past Week
                     </button>
                     <button 
-                      className={`ai-pill-btn ${period === 'MONTH' ? 'active' : ''}`}
-                      onClick={() => setPeriod('MONTH')}
+                      className={`ai-pill-btn ${period === 'MONTHS' ? 'active' : ''}`}
+                      onClick={() => setPeriod('MONTHS')}
                     >
                       Past Month
                     </button>
                     <button 
-                      className={`ai-pill-btn ${period === 'YEAR' ? 'active' : ''}`}
-                      onClick={() => setPeriod('YEAR')}
+                      className={`ai-pill-btn ${period === 'YEARS' ? 'active' : ''}`}
+                      onClick={() => setPeriod('YEARS')}
                     >
                       Past Year
                     </button>
