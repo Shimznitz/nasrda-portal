@@ -721,3 +721,108 @@
   .docs-chain-preview { padding: 12px 16px; }
   .docs-connector { width: 32px; }
 }
+
+/* ── Drive panel ──────────────────────────────── */
+.docs-drive-panel {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 16px 20px;
+  margin-bottom: 20px;
+}
+
+.docs-drive-panel-label {
+  font-size: 0.68rem;
+  color: var(--text3);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-family: 'IBM Plex Mono', monospace;
+  font-weight: 600;
+  margin-bottom: 10px;
+}
+
+.docs-drive-btns {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.docs-drive-btn {
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+  border: none;
+  transition: all 0.15s;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.docs-drive-btn.division {
+  background: rgba(100,220,180,0.12);
+  color: #64dcb4;
+  border: 1px solid rgba(100,220,180,0.3);
+}
+
+.docs-drive-btn.division:hover { background: rgba(100,220,180,0.2); }
+
+.docs-drive-btn.personal {
+  background: var(--gold-dim);
+  color: var(--gold);
+  border: 1px solid rgba(201,168,76,0.3);
+}
+
+.docs-drive-btn.personal:hover { background: rgba(201,168,76,0.2); }
+
+.docs-drive-btn.add {
+  background: var(--bg3);
+  color: var(--text2);
+  border: 1px dashed var(--border);
+}
+
+.docs-drive-btn.add:hover { border-color: var(--gold); color: var(--gold); }
+
+.docs-drive-btn.edit {
+  background: transparent;
+  color: var(--text3);
+  border: 1px solid var(--border);
+  font-size: 0.75rem;
+}
+
+.docs-drive-btn.edit:hover { color: var(--gold); border-color: var(--gold); }
+
+.docs-drive-missing {
+  font-size: 0.75rem;
+  color: var(--text3);
+  font-style: italic;
+  font-family: 'IBM Plex Mono', monospace;
+}
+
+.docs-drive-hint {
+  font-size: 0.72rem;
+  color: var(--text3);
+  margin-top: 10px;
+  font-family: 'IBM Plex Mono', monospace;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+
+/* ── Secondary open btn ───────────────────────── */
+.docs-open-file-btn.secondary {
+  background: var(--bg3);
+  color: var(--text2);
+  border: 1px solid var(--border);
+  padding: 8px 14px;
+  border-radius: 8px;
+  font-size: 0.82rem;
+  font-weight: 500;
+  text-decoration: none;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.docs-open-file-btn.secondary:hover { border-color: var(--gold); color: var(--gold); }

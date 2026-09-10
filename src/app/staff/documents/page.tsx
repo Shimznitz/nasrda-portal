@@ -94,6 +94,7 @@ function DocumentsContent() {
   const [filter, setFilter] = useState<'all' | 'created' | 'received' | 'action'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [divisionDriveUrl, setDivisionDriveUrl] = useState<string | null>(null);
   
   // Modal state for linking individual Drive folder
   const [driveUrlInput, setDriveUrlInput] = useState('');
@@ -142,6 +143,21 @@ function DocumentsContent() {
           .select('*, profile:profiles!user_reports_profile_id_fkey(id, title, name, email)')
           .or(`profile_id.eq.${uid},recipient_id.eq.${uid}`)
           .order('created_at', { ascending: false }),
+        supabase
+          .from('profiles')
+          .select('division_id')
+          .eq('id', uid)
+          .single()
+          .then(async ({ data: prof }) => {
+            if (prof?.division_id) {
+              const { data: div } = await supabase
+                .from('divisions')
+                .select('drive_folder_url')
+                .eq('id', prof.division_id)
+                .maybeSingle();
+              if (div?.drive_folder_url) setDivisionDriveUrl(div.drive_folder_url);
+            }
+          }),  
       ]);
 
       if (createdRes.error) throw createdRes.error;
@@ -409,24 +425,47 @@ function DocumentsContent() {
 
   return (
     <div className="docs-page">
-      <div className="docs-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <div className="docs-header">
         <div>
           <h1 className="docs-title">Documents</h1>
           <p className="docs-sub">File routing and chain-of-custody tracker</p>
         </div>
-        
-        {/* Button to manage Google Drive folder link */}
-        <button 
-          className="docs-action-btn"
-          style={{ background: 'var(--bg-input, #222)', border: '1px solid #444', padding: '8px 14px', borderRadius: '6px' }}
-          onClick={() => {
-            setDriveUrlInput(userProfile?.drive_folder_url || '');
-            setShowDriveModal(true);
-          }}
-        >
-          📁 {userProfile?.drive_folder_url ? 'Update My Drive Folder' : 'Link Google Drive Folder'}
-        </button>
       </div>
+      {/* ── Drive Access Panel ── */}
+<div className="docs-drive-panel">
+  <div className="docs-drive-panel-label">📁 Quick Drive Access</div>
+  <div className="docs-drive-btns">
+    {divisionDriveUrl ? (
+      <a href={divisionDriveUrl} target="_blank" rel="noreferrer" className="docs-drive-btn division">
+        🗂 Division Drive Folder
+      </a>
+    ) : (
+      <span className="docs-drive-missing">Division drive not set — contact your division head</span>
+    )}
+
+    {userProfile?.drive_folder_url ? (
+      <a href={userProfile.drive_folder_url} target="_blank" rel="noreferrer" className="docs-drive-btn personal">
+        📂 My Personal Drive Folder
+      </a>
+    ) : (
+      <button className="docs-drive-btn add" onClick={() => { setDriveUrlInput(''); setShowDriveModal(true); }}>
+        + Link My Drive Folder
+      </button>
+    )}
+
+    {userProfile?.drive_folder_url && (
+      <button className="docs-drive-btn edit" onClick={() => { setDriveUrlInput(userProfile.drive_folder_url || ''); setShowDriveModal(true); }}>
+        ✏️ Update My Folder
+      </button>
+    )}
+  </div>
+
+  {userProfile?.drive_folder_url && (
+    <div className="docs-drive-hint">
+      💡 When you receive a file, open it and your Drive folder side by side to save a copy.
+    </div>
+  )}
+</div>
 
       {/* Modal for setting Drive Link */}
       {showDriveModal && (
@@ -620,8 +659,7 @@ function DocumentsContent() {
 
                 {isExpanded && (
                   <div className="docs-expanded">
-                    <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginBottom: '16px' }}>
-                      {/* Direct Google Drive Link if provided, otherwise fallback to base file_url */}
+                    <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginBottom: '16px', alignItems: 'center' }}>
                       <a
                         href={r.drive_url || r.file_url}
                         target="_blank"
@@ -629,8 +667,30 @@ function DocumentsContent() {
                         className="docs-open-file-btn"
                         onClick={() => markOpened(r.id)}
                       >
-                        {r.drive_url ? '📂 Open Document (Drive)' : '🔗 Open Document File'}
+                        {r.drive_url ? '📂 Open Document' : '🔗 Open Document'}
                       </a>
+                      
+                      {/* Show personal drive button alongside file when user is a recipient */}
+                      {myRec && userProfile?.drive_folder_url && (
+                        <a
+                          href={userProfile.drive_folder_url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="docs-open-file-btn secondary"
+                          title="Open your Drive folder to save a copy of this file"
+                        >
+                          📁 My Drive Folder
+                        </a>
+                      )}
+                      
+                      {myRec && !userProfile?.drive_folder_url && (
+                        <button
+                          className="docs-open-file-btn secondary"
+                          onClick={() => setShowDriveModal(true)}
+                        >
+                          + Link Drive to save files
+                        </button>
+                      )}
                     </div>
 
                     {myRec && myRec.status !== 'DONE' && r.status !== 'COMPLETED' && (
