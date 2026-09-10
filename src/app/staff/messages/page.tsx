@@ -21,6 +21,7 @@ export default function MessagesPage() {
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [sending, setSending] = useState(false);
   const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({});
+  const [showMobileChat, setShowMobileChat] = useState(false); // Mobile view toggle
 
   const bottomRef = useRef<HTMLDivElement>(null);
   const profileRef = useRef<any>(null);
@@ -107,7 +108,6 @@ export default function MessagesPage() {
     setUnreadCounts(prev => ({ ...prev, [otherId]: 0 }));
   };
 
-  // Fixed: Search using valid table columns (name, email, staff_no)
   useEffect(() => {
     const doSearch = async () => {
       const query = search.trim();
@@ -139,6 +139,7 @@ export default function MessagesPage() {
     activeConvRef.current = other;
     setSearch('');
     setSearchResults([]);
+    setShowMobileChat(true); // Open chat view on mobile
     if (profileRef.current) {
       await loadMessages(other.id, profileRef.current.id);
     }
@@ -181,7 +182,7 @@ export default function MessagesPage() {
   const totalUnread = Object.values(unreadCounts).reduce((a: number, b) => a + (b as number), 0);
 
   return (
-    <div className="messages-page">
+    <div className={`messages-page ${showMobileChat ? 'mobile-chat-active' : ''}`}>
       {/* ── Sidebar ──────────────────────────────── */}
       <div className="msg-sidebar">
         <div className="msg-sidebar-header">
@@ -253,16 +254,22 @@ export default function MessagesPage() {
           </div>
         ) : (
           <>
-          <div className="msg-chat-header">
-            <button className="msg-back-btn" onClick={() => setActiveConv(null)}>
-              ←
-            </button>
-            <Avatar name={displayName(activeConv)} avatarUrl={activeConv.avatar_url} size="md" />
-            <div className="msg-chat-header-info">
-              <div className="msg-chat-name">{displayName(activeConv)}</div>
-              <div className="msg-chat-role">{getRole(activeConv)}</div>
+            <div className="msg-chat-header">
+              <button 
+                className="msg-back-btn" 
+                onClick={() => {
+                  setActiveConv(null);
+                  setShowMobileChat(false);
+                }}
+              >
+                ←
+              </button>
+              <Avatar name={displayName(activeConv)} avatarUrl={activeConv.avatar_url} size="md" />
+              <div className="msg-chat-header-info">
+                <div className="msg-chat-name">{displayName(activeConv)}</div>
+                <div className="msg-chat-role">{getRole(activeConv)}</div>
+              </div>
             </div>
-          </div>
 
             <div className="msg-chat-body">
               {messages.length === 0 ? (
