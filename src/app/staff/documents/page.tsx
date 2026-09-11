@@ -17,6 +17,8 @@ interface Profile {
   designation?: string | null;
   avatar_url?: string | null;
   drive_folder_url?: string | null;
+  role?: string | null;
+  division_id?: string | null;
 }
 
 interface FileRouteRecipient {
@@ -95,6 +97,11 @@ function DocumentsContent() {
   const [searchQuery, setSearchQuery] = useState('');
   const [expanded, setExpanded] = useState<string | null>(null);
   const [divisionDriveUrl, setDivisionDriveUrl] = useState<string | null>(null);
+  const [userRole, setUserRole] = useState<string>('');
+  const [userDivisionId, setUserDivisionId] = useState<string | null>(null);
+  const [showDivisionDriveModal, setShowDivisionDriveModal] = useState(false);
+  const [divisionDriveInput, setDivisionDriveInput] = useState('');
+  const [savingDivisionDrive, setSavingDivisionDrive] = useState(false);
   
   // Modal state for linking individual Drive folder
   const [driveUrlInput, setDriveUrlInput] = useState('');
@@ -135,7 +142,7 @@ function DocumentsContent() {
           .eq('profile_id', uid),
         supabase
           .from('profiles')
-          .select('id, title, name, email, designation, avatar_url, drive_folder_url')
+          .select('id, title, name, email, designation, avatar_url, drive_folder_url, role, division_id')
           .eq('id', uid)
           .single(),
         supabase
@@ -143,26 +150,26 @@ function DocumentsContent() {
           .select('*, profile:profiles!user_reports_profile_id_fkey(id, title, name, email)')
           .or(`profile_id.eq.${uid},recipient_id.eq.${uid}`)
           .order('created_at', { ascending: false }),
-        supabase
-          .from('profiles')
-          .select('division_id')
-          .eq('id', uid)
-          .single()
-          .then(async ({ data: prof }) => {
-            if (prof?.division_id) {
-              const { data: div } = await supabase
-                .from('divisions')
-                .select('drive_folder_url')
-                .eq('id', prof.division_id)
-                .maybeSingle();
-              if (div?.drive_folder_url) setDivisionDriveUrl(div.drive_folder_url);
-            }
-          }),  
       ]);
+
+      const profDivisionId = userProfRes.data?.division_id || null;
+      if (profDivisionId) {
+        const { data: div } = await supabase
+          .from('divisions')
+          .select('drive_folder_url')
+          .eq('id', profDivisionId)
+          .maybeSingle();
+        if (div?.drive_folder_url) setDivisionDriveUrl(div.drive_folder_url);
+        else setDivisionDriveUrl(null);
+      }
 
       if (createdRes.error) throw createdRes.error;
       if (recipRowsRes.error) throw recipRowsRes.error;
-      if (userProfRes.data) setUserProfile(userProfRes.data);
+      if (userProfRes.data) {
+        setUserProfile(userProfRes.data);
+        setUserRole(userProfRes.data.role || '');
+        setUserDivisionId(userProfRes.data.division_id || null);
+      }
       if (reportsRes.data) setUserReports(reportsRes.data as UserReport[]);
 
       const created = (createdRes.data as unknown as FileRoute[]) || [];
@@ -253,6 +260,28 @@ function DocumentsContent() {
     load();
     return () => { mounted = false; };
   }, [fetchRoutes]);
+
+  const handleSaveDivisionDriveUrl = async () => {
+    if (!divisionDriveInput.trim() || !userDivisionId) return;
+    setSavingDivisionDrive(true);
+    try {
+      const { error } = await supabase
+        .from('divisions')
+        .update({ drive_folder_url: divisionDriveInput.trim() })
+        .eq('id', userDivisionId);
+
+      if (error) throw error;
+
+      setDivisionDriveUrl(divisionDriveInput.trim());
+      setShowDivisionDriveModal(false);
+      setDivisionDriveInput('');
+    } catch (err) {
+      console.error('Failed to save division Drive URL:', err);
+      alert('Could not update division Drive URL. Please try again.');
+    } finally {
+      setSavingDivisionDrive(false);
+    }
+  };
 
   // Save/Update Google Drive Folder Link for current user
   const handleSaveDriveUrl = async () => {
@@ -431,41 +460,115 @@ function DocumentsContent() {
           <p className="docs-sub">File routing and chain-of-custody tracker</p>
         </div>
       </div>
+      
       {/* ── Drive Access Panel ── */}
-<div className="docs-drive-panel">
-  <div className="docs-drive-panel-label">📁 Quick Drive Access</div>
-  <div className="docs-drive-btns">
-    {divisionDriveUrl ? (
-      <a href={divisionDriveUrl} target="_blank" rel="noreferrer" className="docs-drive-btn division">
-        🗂 Division Drive Folder
-      </a>
-    ) : (
-      <span className="docs-drive-missing">Division drive not set — contact your division head</span>
-    )}
+      <div className="docs-drive-panel">
+        <div className="docs-drive-panel-label">📁 Quick Drive Access</div>
+        <div className="docs-drive-btns">
+          {/* Division drive — visible to all, editable only by DIVISION_HEAD */}
+          {divisionDriveUrl ? (
+            <a href={divisionDriveUrl} target="_blank" rel="noreferrer" className="docs-drive-btn division">
+              🗂 Division Shared Drive
+            </a>
+          ) : userRole === 'DIVISION_HEAD' ? (
+            <button
+              className="docs-drive-btn add"
+              onClick={() => { setDivisionDriveInput(''); setShowDivisionDriveModal(true); }}
+            >
+              + Set Division Shared Drive
+            </button>
+          ) : (
+            <span className="docs-drive-missing">Division shared drive not set yet</span>
+          )}
+          
+          {/* Division head edit button if drive already set */}
+          {divisionDriveUrl && userRole === 'DIVISION_HEAD' && (
+            <button
+              className="docs-drive-btn edit"
+              onClick={() => { setDivisionDriveInput(divisionDriveUrl || ''); setShowDivisionDriveModal(true); }}
+            >
+              ✏️ Update Division Drive
+            </button>
+          )}
 
-    {userProfile?.drive_folder_url ? (
-      <a href={userProfile.drive_folder_url} target="_blank" rel="noreferrer" className="docs-drive-btn personal">
-        📂 My Personal Drive Folder
-      </a>
-    ) : (
-      <button className="docs-drive-btn add" onClick={() => { setDriveUrlInput(''); setShowDriveModal(true); }}>
-        + Link My Drive Folder
-      </button>
-    )}
+          {/* Personal drive — visible and editable by everyone */}
+          {userProfile?.drive_folder_url ? (
+            <a href={userProfile.drive_folder_url} target="_blank" rel="noreferrer" className="docs-drive-btn personal">
+              📂 My Personal Drive
+            </a>
+          ) : (
+            <button
+              className="docs-drive-btn add"
+              onClick={() => { setDriveUrlInput(''); setShowDriveModal(true); }}
+            >
+              + Link My Drive Folder
+            </button>
+          )}
+          
+          {userProfile?.drive_folder_url && (
+            <button
+              className="docs-drive-btn edit"
+              onClick={() => { setDriveUrlInput(userProfile.drive_folder_url || ''); setShowDriveModal(true); }}
+            >
+              ✏️ Update My Folder
+            </button>
+          )}
+        </div>
+        {(userProfile?.drive_folder_url || divisionDriveUrl) && (
+          <div className="docs-drive-hint">
+            💡 When you receive a file, open it and your Drive folder side by side to save a copy locally.
+          </div>
+        )}
+      </div>
 
-    {userProfile?.drive_folder_url && (
-      <button className="docs-drive-btn edit" onClick={() => { setDriveUrlInput(userProfile.drive_folder_url || ''); setShowDriveModal(true); }}>
-        ✏️ Update My Folder
-      </button>
-    )}
-  </div>
-
-  {userProfile?.drive_folder_url && (
-    <div className="docs-drive-hint">
-      💡 When you receive a file, open it and your Drive folder side by side to save a copy.
-    </div>
-  )}
-</div>
+      {/* Modal for setting Division Shared Drive Link */}
+      {showDivisionDriveModal && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 1000,
+          display: 'flex', justifyContent: 'center', alignItems: 'center'
+        }}>
+          <div style={{
+            background: '#1e1e1e', padding: '24px', borderRadius: '8px',
+            maxWidth: '480px', width: '100%', border: '1px solid #333'
+          }}>
+            <h3 style={{ color: '#fff', marginTop: 0 }}>Set Division Shared Drive Folder</h3>
+            <p style={{ fontSize: '0.85rem', color: '#aaa', margin: '8px 0 16px' }}>
+              This link will be visible to all members of your division so they can access
+              shared documents. Paste the shareable Google Drive folder link below.
+            </p>
+            <input
+              type="text"
+              placeholder="https://drive.google.com/drive/folders/..."
+              value={divisionDriveInput}
+              onChange={e => setDivisionDriveInput(e.target.value)}
+              style={{
+                width: '100%', padding: '10px', borderRadius: '4px',
+                border: '1px solid #444', background: '#111', color: '#fff',
+                boxSizing: 'border-box'
+              }}
+            />
+            <div style={{ marginTop: '16px', display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => { setShowDivisionDriveModal(false); setDivisionDriveInput(''); }}
+                style={{ padding: '6px 12px', background: 'transparent', border: 'none', color: '#aaa', cursor: 'pointer' }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveDivisionDriveUrl}
+                disabled={savingDivisionDrive || !divisionDriveInput.trim()}
+                style={{
+                  padding: '6px 16px', background: '#64dcb4', border: 'none',
+                  borderRadius: '4px', color: '#000', fontWeight: 600, cursor: 'pointer',
+                  opacity: savingDivisionDrive || !divisionDriveInput.trim() ? 0.5 : 1
+                }}
+              >
+                {savingDivisionDrive ? 'Saving...' : 'Save Division Link'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal for setting Drive Link */}
       {showDriveModal && (
@@ -799,7 +902,7 @@ function DocumentsContent() {
 
 export default function DocumentsPage() {
   return (
-    <Suspense fallback={<div className="docs-loading-page"><span>Loading documents…</span></div>}>
+    <Suspense fallback={<div className="docs-loading-page"><div className="docs-loading-bar" /><span>Loading documents…</span></div>}>
       <DocumentsContent />
     </Suspense>
   );
